@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { usePatientPortal } from '../context/PatientPortalContext'
+import { useI18n } from '../i18n/I18nContext'
 
 export function PatientTrainingDetailPage() {
+  const { t } = useI18n()
   const { taskId = '' } = useParams<{ taskId: string }>()
   const { tasks, completeTask } = usePatientPortal()
   const task = useMemo(() => tasks.find((x) => x.id === taskId), [tasks, taskId])
@@ -12,8 +14,8 @@ export function PatientTrainingDetailPage() {
     return (
       <div className="role-page portal-page patient-portal">
         <section className="card">
-          <h1>训练项不存在</h1>
-          <Link className="btn ghost" to="/patient/training">返回训练计划</Link>
+          <h1>{t('taskNotFound')}</h1>
+          <Link className="btn ghost" to="/patient/training">{t('backToTrainingPlan')}</Link>
         </section>
       </div>
     )
@@ -26,14 +28,14 @@ export function PatientTrainingDetailPage() {
           <h1>{task.title}</h1>
           <p className="muted">{task.week} · {task.target}</p>
         </div>
-        <Link className="btn ghost" to="/patient/training">返回训练计划</Link>
+        <Link className="btn ghost" to="/patient/training">{t('backToTrainingPlan')}</Link>
       </header>
 
       <section className="card">
-        <h2 className="card-title">动作视频</h2>
+        <h2 className="card-title">{t('movementVideo')}</h2>
         <div className="video-wrap">
           <iframe
-            title={`${task.title} 视频教程`}
+            title={t('taskVideoTitle').replace('{title}', task.title)}
             src={task.videoUrl}
             loading="lazy"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -43,11 +45,11 @@ export function PatientTrainingDetailPage() {
       </section>
 
       <section className="card">
-        <h2 className="card-title">训练记录</h2>
-        <p className="muted">训练时长：{seconds} 秒</p>
+        <h2 className="card-title">{t('trainingRecord')}</h2>
+        <p className="muted">{t('trainingDuration')}：{seconds} {t('seconds')}</p>
         <div className="role-actions">
           <button type="button" className="btn ghost" onClick={() => setSeconds((x) => x + 60)}>
-            记录 +1 分钟
+            {t('addMinute')}
           </button>
           <button
             type="button"
@@ -57,7 +59,7 @@ export function PatientTrainingDetailPage() {
               setSeconds(0)
             }}
           >
-            完成本次训练
+            {t('finishTraining')}
           </button>
         </div>
       </section>

@@ -63,8 +63,8 @@ export function AppLayout({
             <ViewShareBar />
           </div>
           <div className="patient-row top-right">
-            <Link className="btn ghost" to="/roles" aria-label="返回多端入口">
-              返回多端入口
+            <Link className="btn ghost" to="/roles" aria-label={t('backToRoles')}>
+              {t('backToRoles')}
             </Link>
             <LanguageSwitcher />
           </div>

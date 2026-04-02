@@ -54,8 +54,10 @@ export function HistoryPage() {
       (last.metrics.knee_flexion_rom?.value ?? 0) - (first.metrics.knee_flexion_rom?.value ?? 0)
     const mmtDelta =
       (last.metrics.quadriceps_mmt?.value ?? 0) - (first.metrics.quadriceps_mmt?.value ?? 0)
-    return `自动分析：ROM 变化 ${romDelta >= 0 ? '+' : ''}${romDelta}°；MMT 变化 ${mmtDelta >= 0 ? '+' : ''}${mmtDelta}。`
-  }, [selectedRecords])
+    const rom = `${romDelta >= 0 ? '+' : ''}${romDelta}`
+    const mmt = `${mmtDelta >= 0 ? '+' : ''}${mmtDelta}`
+    return t('historyAutoAnalyzeResult', { rom, mmt })
+  }, [selectedRecords, t])
 
   return (
     <div className="page doctor-workspace-page">
@@ -71,7 +73,7 @@ export function HistoryPage() {
           <section className="card"><HistoryTable rows={rows} selectedIds={selected} onToggle={toggle} /></section>
           <section className="card"><h2 className="card-title">{t('metricCompare')}</h2><ComparisonPanel records={selectedRecords} /></section>
           <section className="card">
-            <p className="muted small">请勾选2条以上历史记录，系统将自动生成指标对比分析报告。</p>
+            <p className="muted small">{t('historyAutoAnalyzePrompt')}</p>
             {selectedRecords.length >= 2 ? (
               <>
                 <ReactECharts option={compareOption} style={{ height: 260 }} />

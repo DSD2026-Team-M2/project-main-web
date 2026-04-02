@@ -6,6 +6,7 @@ import type {
   TimeRangePreset,
   TrendSeries,
 } from '../types/clinical'
+import { getRuntimeLocale } from '../i18n/runtime'
 import {
   mockEventsForPatient,
   mockHistoryForPatient,
@@ -15,6 +16,12 @@ import {
 } from './mock/clinicalMock'
 
 const MOCK_LATENCY_MS = { min: 280, max: 720 }
+const tr = (zh: string, en: string, pt: string) => {
+  const locale = getRuntimeLocale()
+  if (locale === 'en') return en
+  if (locale === 'pt-BR') return pt
+  return zh
+}
 
 function delay(): Promise<void> {
   const ms =
@@ -45,7 +52,7 @@ const USE_MOCK = true
 
 export const clinicalApi = {
   async listPatients(): Promise<PatientSummary[]> {
-    if (!USE_MOCK) throw new Error('请配置 REST 基地址并实现 listPatients')
+    if (!USE_MOCK) throw new Error(tr('请配置 REST 基地址并实现 listPatients', 'Please configure REST base URL and implement listPatients', 'Configure a URL base REST e implemente listPatients'))
     await delay()
     return mockPatients()
   },
@@ -54,7 +61,7 @@ export const clinicalApi = {
     patientId: string,
     range: TimeRangePreset,
   ): Promise<TrendSeries[]> {
-    if (!USE_MOCK) throw new Error('请实现 GET /patients/:id/trends')
+    if (!USE_MOCK) throw new Error(tr('请实现 GET /patients/:id/trends', 'Please implement GET /patients/:id/trends', 'Implemente GET /patients/:id/trends'))
     await delay()
     const raw = mockTrendsForPatient(patientId, range)
     return filterByRange(raw, range)
@@ -64,7 +71,7 @@ export const clinicalApi = {
     patientId: string,
     range: TimeRangePreset,
   ): Promise<ClinicalEvent[]> {
-    if (!USE_MOCK) throw new Error('请实现 GET /patients/:id/events')
+    if (!USE_MOCK) throw new Error(tr('请实现 GET /patients/:id/events', 'Please implement GET /patients/:id/events', 'Implemente GET /patients/:id/events'))
     await delay()
     const events = mockEventsForPatient(patientId)
     if (range === 'all') return events
@@ -77,13 +84,13 @@ export const clinicalApi = {
   },
 
   async getHistory(patientId: string): Promise<HistoryRecord[]> {
-    if (!USE_MOCK) throw new Error('请实现 GET /patients/:id/sessions')
+    if (!USE_MOCK) throw new Error(tr('请实现 GET /patients/:id/sessions', 'Please implement GET /patients/:id/sessions', 'Implemente GET /patients/:id/sessions'))
     await delay()
     return mockHistoryForPatient(patientId)
   },
 
   async getLimbOverlay(patientId: string): Promise<LimbModelState> {
-    if (!USE_MOCK) throw new Error('请实现 GET /patients/:id/limb-overlay')
+    if (!USE_MOCK) throw new Error(tr('请实现 GET /patients/:id/limb-overlay', 'Please implement GET /patients/:id/limb-overlay', 'Implemente GET /patients/:id/limb-overlay'))
     await delay()
     return mockLimbState(patientId)
   },

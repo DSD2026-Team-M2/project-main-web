@@ -3,10 +3,12 @@ import { TrendChart } from '../components/charts/TrendChart'
 import { HistoryTable } from '../components/history/HistoryTable'
 import { usePatient } from '../context/PatientContext'
 import { usePatientPortal } from '../context/PatientPortalContext'
+import { useI18n } from '../i18n/I18nContext'
 import { clinicalApi } from '../services/clinicalApi'
 import type { ClinicalEvent, HistoryRecord, TimeRangePreset, TrendSeries } from '../types/clinical'
 
 export function PatientRecoveryDataPage() {
+  const { t } = useI18n()
   const { patientId } = usePatient()
   const { painHistory } = usePatientPortal()
   const [range, setRange] = useState<TimeRangePreset>('month')
@@ -29,11 +31,11 @@ export function PatientRecoveryDataPage() {
       setEvents(e)
       setHistory(h)
     } catch (error) {
-      setErr(error instanceof Error ? error.message : '数据加载失败')
+      setErr(error instanceof Error ? error.message : t('loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [patientId, range])
+  }, [patientId, range, t])
 
   useEffect(() => {
     void load()
@@ -66,8 +68,8 @@ export function PatientRecoveryDataPage() {
     <div className="role-page portal-page patient-portal">
       <header className="page-header">
         <div>
-          <h1>恢复数据</h1>
-          <p className="muted">按周/月查看达成率、疼痛评分、关节活动度与肌力变化趋势。</p>
+          <h1>{t('recoveryDataTitle')}</h1>
+          <p className="muted">{t('recoveryDataDesc')}</p>
         </div>
         <div className="role-actions">
           <div className="range-toggle">
@@ -78,25 +80,25 @@ export function PatientRecoveryDataPage() {
                 className={`btn ${range === k ? 'primary' : 'ghost'}`}
                 onClick={() => setRange(k)}
               >
-                {k}
+                {k === 'week' ? t('week') : k === 'month' ? t('month') : t('all')}
               </button>
             ))}
           </div>
-          <button type="button" className="btn ghost" onClick={exportReport}>导出报告</button>
+          <button type="button" className="btn ghost" onClick={exportReport}>{t('exportReport')}</button>
         </div>
       </header>
 
-      {loading ? <section className="card">数据加载中...</section> : null}
+      {loading ? <section className="card">{t('dataLoading')}</section> : null}
       {err ? <section className="card risk-list risk-high">{err}</section> : null}
 
       {!loading && !err ? (
         <>
           <section className="card">
-            <h2 className="card-title">核心趋势图</h2>
+            <h2 className="card-title">{t('coreTrendChart')}</h2>
             <TrendChart seriesList={[...series, painSeries]} events={events} height={420} />
           </section>
           <section className="card">
-            <h2 className="card-title">历史记录</h2>
+            <h2 className="card-title">{t('historyRecords')}</h2>
             <HistoryTable rows={history} selectedIds={new Set()} onToggle={() => {}} />
           </section>
         </>

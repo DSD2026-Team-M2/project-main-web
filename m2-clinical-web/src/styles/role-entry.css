@@ -23,6 +23,13 @@
   overflow: hidden;
 }
 
+.entry-tools {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  z-index: 2;
+}
+
 .entry-hero::after {
   content: '';
   position: absolute;

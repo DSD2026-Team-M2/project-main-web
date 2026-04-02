@@ -54,10 +54,10 @@ function NotesForPatient({ patientId }: { patientId: string }) {
     <section className="card notes-card">
       <header className="card-head"><h3>{t('notesTitle')}</h3><p className="muted small">{t('notesDesc')}</p></header>
       <div className="notes-toolbar">
-        <button type="button" className="btn ghost" onClick={() => applyCmd('bold')}>加粗</button>
-        <button type="button" className="btn ghost" onClick={() => applyCmd('insertUnorderedList')}>列表</button>
+        <button type="button" className="btn ghost" onClick={() => applyCmd('bold')}>{t('notesBold')}</button>
+        <button type="button" className="btn ghost" onClick={() => applyCmd('insertUnorderedList')}>{t('notesList')}</button>
         <label className="btn ghost">
-          插入图片
+          {t('notesInsertImage')}
           <input
             type="file"
             accept="image/*"
@@ -80,7 +80,7 @@ function NotesForPatient({ patientId }: { patientId: string }) {
       <div className="notes-actions"><button type="button" className="btn primary" onClick={save}>{t('saveNotes')}</button>{saved ? <span className="muted small">{t('saved')}</span> : null}</div>
       {versions.length ? (
         <div className="notes-versions">
-          <p className="small muted">历史版本回溯</p>
+          <p className="small muted">{t('notesHistoryVersions')}</p>
           <div className="role-actions">
             {versions.map((v) => (
               <button

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import { loadDecision, loadDoctorOrder, subscribeDoctorSync } from '../services/clinicalBridge'
+import { useI18n } from '../i18n/I18nContext'
 import { usePatient } from './PatientContext'
 
 type Task = {
@@ -59,50 +60,29 @@ function getStoredState() {
   }
 }
 
-const defaultTasks: Task[] = [
-  {
-    id: 'w1',
-    title: '膝关节屈伸训练',
-    target: '每天 2 轮 / 每轮 10 分钟',
-    done: 11,
-    total: 14,
-    week: '第 8 周',
-    caution: '动作过程避免突然发力，屈伸节奏保持稳定。',
-    videoUrl: 'https://www.youtube.com/embed/2kNf8yx_Bf8',
-  },
-  {
-    id: 'w2',
-    title: '疼痛评分记录',
-    target: '每天训练后 1 次',
-    done: 6,
-    total: 7,
-    week: '第 8 周',
-    caution: '训练完成 10 分钟内记录评分，便于医生调整负荷。',
-    videoUrl: 'https://www.youtube.com/embed/YlZQyP6iPqg',
-  },
-  {
-    id: 'w3',
-    title: '平衡与步态训练',
-    target: '每周 3 次',
-    done: 2,
-    total: 3,
-    week: '第 8 周',
-    caution: '建议家属陪同，先慢速完成，再逐步提升稳定性。',
-    videoUrl: 'https://www.youtube.com/embed/gXQ6fJk7AoA',
-  },
-]
+function makeDefaultTasks(tr: (zh: string, en: string, pt: string) => string): Task[] {
+  return [
+    { id: 'w1', title: tr('膝关节屈伸训练', 'Knee flexion-extension training', 'Treino de flexao-extensao do joelho'), target: tr('每天 2 轮 / 每轮 10 分钟', '2 rounds/day, 10 minutes each', '2 series por dia, 10 minutos cada'), done: 11, total: 14, week: tr('第 8 周', 'Week 8', 'Semana 8'), caution: tr('动作过程避免突然发力，屈伸节奏保持稳定。', 'Avoid sudden force; keep a steady flexion-extension rhythm.', 'Evite forca brusca; mantenha ritmo estavel de flexao-extensao.'), videoUrl: 'https://www.youtube.com/embed/2kNf8yx_Bf8' },
+    { id: 'w2', title: tr('疼痛评分记录', 'Pain score logging', 'Registro da pontuacao de dor'), target: tr('每天训练后 1 次', 'Once after daily training', 'Uma vez apos o treino diario'), done: 6, total: 7, week: tr('第 8 周', 'Week 8', 'Semana 8'), caution: tr('训练完成 10 分钟内记录评分，便于医生调整负荷。', 'Log your score within 10 minutes after training to help load adjustment.', 'Registre a pontuacao em ate 10 minutos apos o treino para ajuste de carga.'), videoUrl: 'https://www.youtube.com/embed/YlZQyP6iPqg' },
+    { id: 'w3', title: tr('平衡与步态训练', 'Balance and gait training', 'Treino de equilibrio e marcha'), target: tr('每周 3 次', '3 times/week', '3 vezes por semana'), done: 2, total: 3, week: tr('第 8 周', 'Week 8', 'Semana 8'), caution: tr('建议家属陪同，先慢速完成，再逐步提升稳定性。', 'Family supervision recommended; start slow, then improve stability.', 'Recomenda-se acompanhamento familiar; inicie devagar e evolua a estabilidade.'), videoUrl: 'https://www.youtube.com/embed/gXQ6fJk7AoA' },
+  ]
+}
 
-const defaultFollowUps: FollowUpItem[] = [
-  { id: 'f1', dateTime: '2026-04-06 14:30', doctor: '王医生', mode: 'online', status: 'upcoming' },
-  { id: 'f2', dateTime: '2026-03-22 10:00', doctor: '王医生', mode: 'offline', status: 'done' },
-]
+function makeDefaultFollowups(tr: (zh: string, en: string, pt: string) => string): FollowUpItem[] {
+  return [
+    { id: 'f1', dateTime: '2026-04-06 14:30', doctor: tr('王医生', 'Dr. Wang', 'Dr. Wang'), mode: 'online', status: 'upcoming' },
+    { id: 'f2', dateTime: '2026-03-22 10:00', doctor: tr('王医生', 'Dr. Wang', 'Dr. Wang'), mode: 'offline', status: 'done' },
+  ]
+}
 
 const PatientPortalContext = createContext<PatientPortalContextValue | null>(null)
 
 export function PatientPortalProvider({ children }: { children: ReactNode }) {
+  const { locale } = useI18n()
+  const tr = (zh: string, en: string, pt: string) => (locale === 'en' ? en : locale === 'pt-BR' ? pt : zh)
   const { patientId } = usePatient()
   const initial = getStoredState()
-  const [tasks, setTasks] = useState<Task[]>(initial?.tasks?.length ? initial.tasks : defaultTasks)
+  const [tasks, setTasks] = useState<Task[]>(initial?.tasks?.length ? initial.tasks : makeDefaultTasks(tr))
   const [painScore, setPainScore] = useState(
     typeof initial?.painScore === 'number' ? initial.painScore : 3,
   )
@@ -112,6 +92,17 @@ export function PatientPortalProvider({ children }: { children: ReactNode }) {
   const [todayCheckInDone, setTodayCheckInDone] = useState(Boolean(initial?.todayCheckInDone))
   const [doctorOrder, setDoctorOrder] = useState<PatientPortalContextValue['doctorOrder']>(null)
   const [doctorDecision, setDoctorDecision] = useState<PatientPortalContextValue['doctorDecision']>(null)
+  const followUps = useMemo(() => makeDefaultFollowups(tr), [locale])
+
+  useEffect(() => {
+    const localized = makeDefaultTasks(tr)
+    setTasks((prev) =>
+      prev.map((task) => {
+        const base = localized.find((x) => x.id === task.id)
+        return base ? { ...base, done: task.done, total: task.total } : task
+      }),
+    )
+  }, [locale])
 
   useEffect(() => {
     const refresh = () => {
@@ -159,12 +150,16 @@ export function PatientPortalProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       tasks,
-      followUps: defaultFollowUps,
+      followUps,
       painScore,
       painHistory,
       doctorMessage:
         doctorOrder?.advice ||
-        '本周建议保持当前训练节奏，重点关注步态稳定性。若出现持续性肿胀，请先降低训练强度并及时反馈。',
+        tr(
+          '本周建议保持当前训练节奏，重点关注步态稳定性。若出现持续性肿胀，请先降低训练强度并及时反馈。',
+          'Keep current training cadence this week and focus on gait stability. If swelling persists, reduce intensity and report promptly.',
+          'Mantenha o ritmo de treino nesta semana e foque na estabilidade da marcha. Se o inchaco persistir, reduza a intensidade e avise a equipe.',
+        ),
       todayCheckInDone,
       doctorOrder,
       doctorDecision,
@@ -172,7 +167,7 @@ export function PatientPortalProvider({ children }: { children: ReactNode }) {
       updatePainScore,
       toggleTodayCheckIn,
     }),
-    [tasks, painScore, painHistory, todayCheckInDone, doctorOrder, doctorDecision],
+    [tasks, followUps, painScore, painHistory, todayCheckInDone, doctorOrder, doctorDecision, locale],
   )
 
   return <PatientPortalContext.Provider value={value}>{children}</PatientPortalContext.Provider>

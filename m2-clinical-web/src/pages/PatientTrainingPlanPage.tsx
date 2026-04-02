@@ -1,20 +1,22 @@
 import { Link } from 'react-router-dom'
 import { usePatientPortal } from '../context/PatientPortalContext'
+import { useI18n } from '../i18n/I18nContext'
 
 export function PatientTrainingPlanPage() {
+  const { t } = useI18n()
   const { tasks } = usePatientPortal()
 
   return (
     <div className="role-page portal-page patient-portal">
       <header className="page-header">
         <div>
-          <h1>训练计划（第 1-12 周）</h1>
-          <p className="muted">按阶段查看康复动作、视频教程与注意事项。</p>
+          <h1>{t('trainingPlanTitle')}</h1>
+          <p className="muted">{t('trainingPlanDesc')}</p>
         </div>
       </header>
 
       <section className="card">
-        <h2 className="card-title">当前阶段：第 8 周重点训练</h2>
+        <h2 className="card-title">{t('trainingCurrentPhase')}</h2>
         <div className="task-list">
           {tasks.map((task) => (
             <article key={task.id} className="task-row task-row-upgraded">
@@ -25,7 +27,7 @@ export function PatientTrainingPlanPage() {
               </div>
               <div className="role-actions">
                 <Link className="btn primary" to={`/patient/training/${task.id}`}>
-                  开始训练
+                  {t('startTraining')}
                 </Link>
               </div>
             </article>

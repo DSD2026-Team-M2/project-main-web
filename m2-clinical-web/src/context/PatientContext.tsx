@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { clinicalApi } from '../services/clinicalApi'
+import { getRuntimeLocale } from '../i18n/runtime'
 import type { PatientSummary } from '../types/clinical'
 
 interface PatientContextValue {
@@ -23,6 +24,12 @@ interface PatientContextValue {
 const PatientContext = createContext<PatientContextValue | null>(null)
 
 const STORAGE_KEY = 'm2_clinical_patient_id'
+const listLoadFailedByLocale = () => {
+  const locale = getRuntimeLocale()
+  if (locale === 'en') return 'Failed to load patient list'
+  if (locale === 'pt-BR') return 'Falha ao carregar a lista de pacientes'
+  return '加载患者列表失败'
+}
 
 export function PatientProvider({ children }: { children: ReactNode }) {
   const [patients, setPatients] = useState<PatientSummary[]>([])
@@ -43,7 +50,7 @@ export function PatientProvider({ children }: { children: ReactNode }) {
       const list = await clinicalApi.listPatients()
       setPatients(list)
     } catch (e) {
-      setListError(e instanceof Error ? e.message : '加载患者列表失败')
+      setListError(e instanceof Error ? e.message : listLoadFailedByLocale())
     } finally {
       setLoadingList(false)
     }

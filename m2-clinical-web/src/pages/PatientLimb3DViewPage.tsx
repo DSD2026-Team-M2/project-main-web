@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { LimbScene } from '../components/limb/LimbScene'
 import { usePatient } from '../context/PatientContext'
+import { useI18n } from '../i18n/I18nContext'
 import { clinicalApi } from '../services/clinicalApi'
 import type { LimbModelState } from '../types/clinical'
 
 export function PatientLimb3DViewPage() {
+  const { t } = useI18n()
   const { patientId } = usePatient()
   const [state, setState] = useState<LimbModelState | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,12 +28,12 @@ export function PatientLimb3DViewPage() {
     <div className="role-page portal-page patient-portal">
       <header className="page-header">
         <div>
-          <h1>3D 肢体视图</h1>
-          <p className="muted">支持旋转、缩放，查看术后部位恢复热力和关节角度。</p>
+          <h1>{t('patientLimbTitle')}</h1>
+          <p className="muted">{t('patientLimbDesc')}</p>
         </div>
-        <button type="button" className="btn ghost" onClick={() => void load()}>刷新视图</button>
+        <button type="button" className="btn ghost" onClick={() => void load()}>{t('refreshView')}</button>
       </header>
-      {loading ? <section className="card">正在加载 3D 模型...</section> : null}
+      {loading ? <section className="card">{t('loading3d')}</section> : null}
       {state ? (
         <section className="card limb-card">
           <div className="limb-meta">

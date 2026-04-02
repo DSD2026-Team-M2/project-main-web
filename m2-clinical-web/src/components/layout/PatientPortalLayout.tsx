@@ -1,15 +1,17 @@
-import { NavLink, Outlet } from 'react-router-dom'
-
-const navItems = [
-  { to: '/patient/home', label: '康复首页' },
-  { to: '/patient/training', label: '训练计划' },
-  { to: '/patient/recovery', label: '恢复数据' },
-  { to: '/patient/follow-up', label: '复诊与随访' },
-  { to: '/patient/limb-3d', label: '3D肢体视图' },
-  { to: '/patient/profile', label: '个人中心' },
-]
+import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useI18n } from '../../i18n/I18nContext'
+import { LanguageSwitcher } from '../common/LanguageSwitcher'
 
 export function PatientPortalLayout() {
+  const { t } = useI18n()
+  const navItems = [
+    { to: '/patient/home', label: t('patientNavHome') },
+    { to: '/patient/training', label: t('patientNavTraining') },
+    { to: '/patient/recovery', label: t('patientNavRecovery') },
+    { to: '/patient/follow-up', label: t('patientNavFollowUp') },
+    { to: '/patient/limb-3d', label: t('patientNavLimb') },
+    { to: '/patient/profile', label: t('patientNavProfile') },
+  ]
   return (
     <div className="patient-shell">
       <header className="patient-nav-header">
@@ -18,9 +20,9 @@ export function PatientPortalLayout() {
             <span className="patient-brand-dot" aria-hidden>
               ●
             </span>
-            ACL 术后康复中心
+            {t('patientNavTitle')}
           </div>
-          <nav className="patient-nav" aria-label="患者端导航">
+          <nav className="patient-nav" aria-label={t('patientNavAria')}>
             {navItems.map((it) => (
               <NavLink
                 key={it.to}
@@ -31,6 +33,12 @@ export function PatientPortalLayout() {
               </NavLink>
             ))}
           </nav>
+          <div className="patient-nav-tools">
+            <Link className="btn ghost role-link" to="/roles">
+              {t('backToRoleEntry')}
+            </Link>
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
       <main className="patient-main-content">

@@ -64,6 +64,12 @@
   gap: 0.35rem;
 }
 
+.patient-nav-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .patient-nav-link {
   text-decoration: none;
   color: #344054;
