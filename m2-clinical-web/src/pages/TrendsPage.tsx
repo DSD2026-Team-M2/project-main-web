@@ -34,7 +34,7 @@ export function TrendsPage() {
   useEffect(() => { void load() }, [load])
 
   return (
-    <div className="page">
+    <div className="page doctor-workspace-page">
       <header className="page-header">
         <div>
           <h1>{t('navTrends')}</h1>

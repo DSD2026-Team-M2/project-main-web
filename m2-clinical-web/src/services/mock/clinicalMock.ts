@@ -67,15 +67,26 @@ export function mockTrendsForPatient(patientId: string, range: TimeRangePreset):
 }
 
 export function mockLimbState(patientId: string): LimbModelState {
+  const isShoulder = patientId === 'p-002'
   return {
     patientId,
     updatedAt: new Date().toISOString(),
-    segments: [
-      { id: 'upper', label: t('大腿', 'Thigh', 'Coxa'), heat: 0.25, angleDeg: 12 },
-      { id: 'knee', label: t('膝关节', 'Knee joint', 'Articulação do joelho'), heat: 0.85, angleDeg: 68 },
-      { id: 'lower', label: t('小腿', 'Shank', 'Perna'), heat: 0.45, angleDeg: 5 },
-    ],
-    caption: t('热力图表示相对负荷/不适主观权重（演示数据）。角度为示意性关节角。', 'Heatmap indicates relative load/discomfort weight (demo). Angles are illustrative joint angles.', 'O mapa de calor indica peso relativo de carga/desconforto (demo). Ângulos são ilustrativos.'),
-    dataMixNote: t('角度：实测惯性单元；热力权重：AI 根据训练日志与问卷推断。', 'Angles: measured IMU data; heat weights: AI inferred from logs and questionnaires.', 'Ângulos: dados medidos por IMU; peso térmico: inferência de IA por logs e questionários.'),
+    segments: isShoulder
+      ? [
+          { id: 'upper', label: t('冈上肌', 'Supraspinatus', 'Supraespinal'), heat: 0.62, angleDeg: 34 },
+          { id: 'knee', label: t('肩峰下间隙', 'Subacromial space', 'Espaço subacromial'), heat: 0.74, angleDeg: 42 },
+          { id: 'lower', label: t('冈下肌', 'Infraspinatus', 'Infraespinal'), heat: 0.55, angleDeg: 28 },
+        ]
+      : [
+          { id: 'upper', label: t('大腿', 'Thigh', 'Coxa'), heat: 0.25, angleDeg: 12 },
+          { id: 'knee', label: t('膝关节', 'Knee joint', 'Articulação do joelho'), heat: 0.85, angleDeg: 68 },
+          { id: 'lower', label: t('小腿', 'Shank', 'Perna'), heat: 0.45, angleDeg: 5 },
+        ],
+    caption: isShoulder
+      ? t('肩袖术后模型：重点关注冈上肌/冈下肌负荷与肩峰下空间变化（演示数据）。', 'Post-rotator cuff model: focus on supraspinatus/infraspinatus load and subacromial space (demo).', 'Modelo pós manguito: foco em carga supra/infraespinal e espaço subacromial (demo).')
+      : t('热力图表示相对负荷/不适主观权重（演示数据）。角度为示意性关节角。', 'Heatmap indicates relative load/discomfort weight (demo). Angles are illustrative joint angles.', 'O mapa de calor indica peso relativo de carga/desconforto (demo). Ângulos são ilustrativos.'),
+    dataMixNote: isShoulder
+      ? t('角度：术后外展活动追踪；热力：AI 根据动作代偿与疼痛问卷推断。', 'Angles: postoperative abduction tracking; heat inferred from compensation and pain forms.', 'Ângulos: rastreio de abdução pós-op; calor inferido por compensação e dor.')
+      : t('角度：实测惯性单元；热力权重：AI 根据训练日志与问卷推断。', 'Angles: measured IMU data; heat weights: AI inferred from logs and questionnaires.', 'Ângulos: dados medidos por IMU; peso térmico: inferência de IA por logs e questionários.'),
   }
 }

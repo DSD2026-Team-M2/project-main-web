@@ -16,6 +16,7 @@ function LimbRig({ state }: { state: LimbModelState }) {
   const { t } = useI18n()
   const seg = (id: string) => state.segments.find((s) => s.id === id)
   const upper = seg('upper'); const knee = seg('knee'); const lower = seg('lower')
+  const isShoulder = state.segments.some((s) => /肩|rotator|supra|infra/i.test(s.label))
   const upperLen = 0.55; const lowerLen = 0.5; const ru = 0.09; const rl = 0.07
   const kneeFlex = THREE.MathUtils.degToRad(knee?.angleDeg ?? 45)
   return (
@@ -26,7 +27,7 @@ function LimbRig({ state }: { state: LimbModelState }) {
         <LimbSegmentMesh position={[0, -lowerLen / 2, 0]} length={lowerLen} radius={rl} heat={lower?.heat ?? 0.3} label={`${lower?.label ?? t('limbDistal')} ${((lower?.heat ?? 0) * 100).toFixed(0)}%`} />
       </group>
       <mesh position={[0, 0.85 - upperLen / 2 - 0.12 - lowerLen - 0.05, 0]}><sphereGeometry args={[0.08, 20, 20]} /><meshStandardMaterial color="#cbd5e1" /></mesh>
-      {knee ? <Text position={[0.35, 0.35, 0]} fontSize={0.06} color="#334155">{t('kneeFlexion')}: {knee.angleDeg ?? 0}°</Text> : null}
+      {knee ? <Text position={[0.35, 0.35, 0]} fontSize={0.06} color="#334155">{isShoulder ? 'Shoulder angle' : t('kneeFlexion')}: {knee.angleDeg ?? 0}°</Text> : null}
     </group>
   )
 }

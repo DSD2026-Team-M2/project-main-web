@@ -25,7 +25,7 @@ export function Limb3DPage() {
   useEffect(() => { void load() }, [load])
 
   return (
-    <div className="page">
+    <div className="page doctor-workspace-page">
       <header className="page-header">
         <div><h1>{t('navLimb')}</h1><p className="muted">{t('limbDesc')}</p></div>
         <button type="button" className="btn ghost" onClick={() => void load()}>{t('refreshOverlay')}</button>

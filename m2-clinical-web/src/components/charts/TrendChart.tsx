@@ -21,6 +21,12 @@ export function TrendChart({ seriesList, events, height = 420 }: { seriesList: T
     }
     const series: echarts.LineSeriesOption[] = []; const legendData: string[] = []
     const markLineData = events.map((e) => ({ xAxis: e.t, label: { show: true, formatter: e.label, position: 'end' as const }, lineStyle: { type: 'dashed' as const, opacity: 0.75 } }))
+    const baseline = (metricKey: string) => {
+      if (metricKey === 'knee_flexion_rom') return [{ yAxis: 120, name: 'ROM达标基线' }]
+      if (metricKey === 'quadriceps_mmt') return [{ yAxis: 4, name: '肌力达标阈值' }]
+      if (metricKey === 'pain_score') return [{ yAxis: 3, name: 'VAS控制线' }]
+      return []
+    }
     seriesList.forEach((s, idx) => {
       const { measured, ai } = splitBySource(s.points)
       const colorBase = idx === 0 ? '#2563eb' : '#0d9488'
@@ -28,7 +34,8 @@ export function TrendChart({ seriesList, events, height = 420 }: { seriesList: T
       const nameA = `${labels[s.metricKey] ?? s.metricKey} (${t('trendAi')})`
       legendData.push(nameM, nameA)
       const anomalyPoints = s.points.filter((p) => p.isAnomaly).map((p) => ({ name: t('anomaly'), coord: [p.t, p.value] as [string, number], value: '!', itemStyle: { color: '#dc2626' }, label: { show: true, formatter: '!', color: '#fff' } }))
-      series.push({ name: nameM, type: 'line', smooth: true, sampling: 'lttb', showSymbol: measured.length < 48, symbolSize: 6, data: measured, itemStyle: { color: colorBase }, lineStyle: { width: 2 }, markLine: idx === 0 && markLineData.length ? { symbol: 'none', data: markLineData } : undefined, markPoint: anomalyPoints.length ? { data: anomalyPoints } : undefined })
+      const combinedLines = [...(idx === 0 ? markLineData : []), ...baseline(s.metricKey)]
+      series.push({ name: nameM, type: 'line', smooth: true, sampling: 'lttb', showSymbol: measured.length < 48, symbolSize: 6, data: measured, itemStyle: { color: colorBase }, lineStyle: { width: 2 }, markLine: combinedLines.length ? { symbol: 'none', data: combinedLines } : undefined, markPoint: anomalyPoints.length ? { data: anomalyPoints } : undefined })
       series.push({ name: nameA, type: 'line', smooth: true, sampling: 'lttb', showSymbol: ai.length < 48, symbolSize: 5, data: ai, itemStyle: { color: dimColor(colorBase, 0.45) }, lineStyle: { type: 'dashed', width: 1.5 } })
     })
     const anomalyByDate = new Map<string, string>(); for (const s of seriesList) for (const p of s.points) if (p.isAnomaly && p.anomalyNote) anomalyByDate.set(p.t, p.anomalyNote)

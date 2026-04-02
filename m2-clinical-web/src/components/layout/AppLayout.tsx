@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Link, Outlet } from 'react-router-dom'
 import { usePatient } from '../../context/PatientContext'
 import { ClinicalNotes } from '../common/ClinicalNotes'
 import { ErrorBanner } from '../common/ErrorBanner'
@@ -28,7 +28,7 @@ export function AppLayout({
       <Sidebar patientId={patientId} />
       <div className="main-column">
         <header className="top-bar">
-          <div className="patient-row">
+          <div className="patient-row top-left">
             <label className="muted small" htmlFor="patient-select">
               {t('patient')}
             </label>
@@ -52,14 +52,21 @@ export function AppLayout({
             )}
             {currentPatient ? (
               <span className="patient-meta muted small">
+                <span className="patient-avatar" aria-hidden>👤</span>
+                {patientId} ·{' '}
                 {currentPatient.diagnosisShort} ·{' '}
                 {currentPatient.limbSide === 'left' ? t('sideLeft') : t('sideRight')}
               </span>
             ) : null}
           </div>
-          <div className="patient-row">
-            <LanguageSwitcher />
+          <div className="patient-row top-center">
             <ViewShareBar />
+          </div>
+          <div className="patient-row top-right">
+            <Link className="btn ghost" to="/roles" aria-label="返回多端入口">
+              返回多端入口
+            </Link>
+            <LanguageSwitcher />
           </div>
         </header>
         <main className="main-content">

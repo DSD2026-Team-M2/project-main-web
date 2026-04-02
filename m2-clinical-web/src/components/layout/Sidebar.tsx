@@ -4,6 +4,7 @@ import { useI18n } from '../../i18n/I18nContext'
 export function Sidebar({ patientId }: { patientId: string }) {
   const { t } = useI18n()
   const items = [
+    { to: 'clinical', label: '临床分期与决策' },
     { to: 'trends', label: t('navTrends') },
     { to: 'history', label: t('navHistory') },
     { to: 'limb', label: t('navLimb') },
@@ -21,7 +22,7 @@ export function Sidebar({ patientId }: { patientId: string }) {
         {items.map((it) => (
           <NavLink
             key={it.to}
-            to={`/p/${patientId}/${it.to}`}
+            to={`/doctor/p/${patientId}/${it.to}`}
             className={({ isActive }) =>
               `nav-link${isActive ? ' active' : ''}`
             }
