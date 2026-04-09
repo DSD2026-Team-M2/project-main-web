@@ -27,7 +27,7 @@ export function RoleHomePage() {
       subtitle: t('roleDoctorSubtitle'),
       desc: t('roleDoctorDesc'),
       points: [t('navTrends'), t('metricCompare'), t('navLimb')],
-      route: '/doctor',
+      route: '/auth/doctor',
       action: t('roleDoctorAction'),
     },
     {
@@ -36,7 +36,7 @@ export function RoleHomePage() {
       subtitle: t('rolePatientSubtitle'),
       desc: t('rolePatientDesc'),
       points: [t('patientNavTraining'), t('patientNavRecovery'), t('patientNavFollowUp')],
-      route: '/patient',
+      route: '/auth/patient',
       action: t('rolePatientAction'),
     },
     {
@@ -45,7 +45,7 @@ export function RoleHomePage() {
       subtitle: t('roleDevSubtitle'),
       desc: t('roleDevDesc'),
       points: [t('roleDevKeyword1'), t('roleDevKeyword2'), t('roleDevKeyword3')],
-      route: '/developer',
+      route: '/auth/developer',
       action: t('roleDevAction'),
     },
   ]

@@ -27,6 +27,7 @@ import { PatientFollowUpPage } from './pages/PatientFollowUpPage'
 import { PatientLimb3DViewPage } from './pages/PatientLimb3DViewPage'
 import { PatientProfilePage } from './pages/PatientProfilePage'
 import { DoctorClinicalPage } from './pages/DoctorClinicalPage'
+import { AuthGatewayPage } from './pages/AuthGatewayPage'
 
 const Limb3DPage = lazy(async () => {
   const m = await import('./pages/Limb3DPage')
@@ -105,6 +106,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<HomeRedirect />} />
               <Route path="/roles" element={<RoleHomePage />} />
+              <Route path="/auth/:role" element={<AuthGatewayPage />} />
               <Route path="/patient" element={<Navigate to="/patient/home" replace />} />
               <Route path="/patient/*" element={<PatientPortalRoot />}>
                 <Route path="home" element={<PatientPortalPage />} />
