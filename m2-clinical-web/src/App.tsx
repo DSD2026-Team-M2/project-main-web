@@ -9,10 +9,7 @@ import {
 } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
 import { PatientProvider, usePatient } from './context/PatientContext'
-import { AppLayout } from './components/layout/AppLayout'
 import { LoadingBlock } from './components/common/LoadingBlock'
-import { TrendsPage } from './pages/TrendsPage'
-import { HistoryPage } from './pages/HistoryPage'
 import { PatientPortalPage } from './pages/PatientPortalPage'
 import { DeveloperPortalPage } from './pages/DeveloperPortalPage'
 import { RoleHomePage } from './pages/RoleHomePage'
@@ -26,8 +23,15 @@ import { PatientRecoveryDataPage } from './pages/PatientRecoveryDataPage'
 import { PatientFollowUpPage } from './pages/PatientFollowUpPage'
 import { PatientLimb3DViewPage } from './pages/PatientLimb3DViewPage'
 import { PatientProfilePage } from './pages/PatientProfilePage'
-import { DoctorClinicalPage } from './pages/DoctorClinicalPage'
 import { AuthGatewayPage } from './pages/AuthGatewayPage'
+import { SkinDevSwitcher } from './skin-engine/SkinDevSwitcher'
+import {
+  DoctorAppShellSkin,
+  DoctorClinicalSkinPage,
+  DoctorHistorySkinPage,
+  DoctorTrendsSkinPage,
+} from './skin-engine/SkinPages'
+import { SkinProvider } from './skin-engine/SkinContext'
 
 const Limb3DPage = lazy(async () => {
   const m = await import('./pages/Limb3DPage')
@@ -64,7 +68,7 @@ function LayoutWithSync() {
     navigate(`/doctor/p/${id}${tail}`)
   }
 
-  return <AppLayout onPatientChange={onPatientChange} />
+  return <DoctorAppShellSkin onPatientChange={onPatientChange} />
 }
 
 function RouteThemeSync() {
@@ -101,56 +105,59 @@ export default function App() {
     <HashRouter>
       <ThemeProvider>
         <I18nProvider>
-          <PatientProvider>
-            <RouteThemeSync />
-            <Routes>
-              <Route path="/" element={<HomeRedirect />} />
-              <Route path="/roles" element={<RoleHomePage />} />
-              <Route path="/auth/:role" element={<AuthGatewayPage />} />
-              <Route path="/patient" element={<Navigate to="/patient/home" replace />} />
-              <Route path="/patient/*" element={<PatientPortalRoot />}>
-                <Route path="home" element={<PatientPortalPage />} />
-                <Route path="training" element={<PatientTrainingPlanPage />} />
-                <Route path="training/:taskId" element={<PatientTrainingDetailPage />} />
-                <Route path="recovery" element={<PatientRecoveryDataPage />} />
-                <Route path="follow-up" element={<PatientFollowUpPage />} />
-                <Route path="limb-3d" element={<PatientLimb3DViewPage />} />
-                <Route path="profile" element={<PatientProfilePage />} />
-                <Route path="*" element={<Navigate to="/patient/home" replace />} />
-              </Route>
-              <Route path="/developer" element={<DeveloperPortalPage />} />
-              <Route path="/doctor" element={<HomeRedirect />} />
-              <Route path="/doctor/p/:patientId" element={<LayoutWithSync />}>
-                <Route index element={<Navigate to="clinical" replace />} />
-                <Route path="clinical" element={<DoctorClinicalPage />} />
-                <Route path="trends" element={<TrendsPage />} />
-                <Route path="history" element={<HistoryPage />} />
-                <Route
-                  path="limb"
-                  element={
-                    <Suspense fallback={<Loading3DFallback />}>
-                      <Limb3DPage />
-                    </Suspense>
-                  }
-                />
-              </Route>
-              <Route path="/p/:patientId" element={<LayoutWithSync />}>
-                <Route index element={<Navigate to="clinical" replace />} />
-                <Route path="clinical" element={<DoctorClinicalPage />} />
-                <Route path="trends" element={<TrendsPage />} />
-                <Route path="history" element={<HistoryPage />} />
-                <Route
-                  path="limb"
-                  element={
-                    <Suspense fallback={<Loading3DFallback />}>
-                      <Limb3DPage />
-                    </Suspense>
-                  }
-                />
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </PatientProvider>
+          <SkinProvider>
+            <PatientProvider>
+              <RouteThemeSync />
+              <SkinDevSwitcher />
+              <Routes>
+                <Route path="/" element={<HomeRedirect />} />
+                <Route path="/roles" element={<RoleHomePage />} />
+                <Route path="/auth/:role" element={<AuthGatewayPage />} />
+                <Route path="/patient" element={<Navigate to="/patient/home" replace />} />
+                <Route path="/patient/*" element={<PatientPortalRoot />}>
+                  <Route path="home" element={<PatientPortalPage />} />
+                  <Route path="training" element={<PatientTrainingPlanPage />} />
+                  <Route path="training/:taskId" element={<PatientTrainingDetailPage />} />
+                  <Route path="recovery" element={<PatientRecoveryDataPage />} />
+                  <Route path="follow-up" element={<PatientFollowUpPage />} />
+                  <Route path="limb-3d" element={<PatientLimb3DViewPage />} />
+                  <Route path="profile" element={<PatientProfilePage />} />
+                  <Route path="*" element={<Navigate to="/patient/home" replace />} />
+                </Route>
+                <Route path="/developer" element={<DeveloperPortalPage />} />
+                <Route path="/doctor" element={<HomeRedirect />} />
+                <Route path="/doctor/p/:patientId" element={<LayoutWithSync />}>
+                  <Route index element={<Navigate to="clinical" replace />} />
+                  <Route path="clinical" element={<DoctorClinicalSkinPage />} />
+                  <Route path="trends" element={<DoctorTrendsSkinPage />} />
+                  <Route path="history" element={<DoctorHistorySkinPage />} />
+                  <Route
+                    path="limb"
+                    element={
+                      <Suspense fallback={<Loading3DFallback />}>
+                        <Limb3DPage />
+                      </Suspense>
+                    }
+                  />
+                </Route>
+                <Route path="/p/:patientId" element={<LayoutWithSync />}>
+                  <Route index element={<Navigate to="clinical" replace />} />
+                  <Route path="clinical" element={<DoctorClinicalSkinPage />} />
+                  <Route path="trends" element={<DoctorTrendsSkinPage />} />
+                  <Route path="history" element={<DoctorHistorySkinPage />} />
+                  <Route
+                    path="limb"
+                    element={
+                      <Suspense fallback={<Loading3DFallback />}>
+                        <Limb3DPage />
+                      </Suspense>
+                    }
+                  />
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </PatientProvider>
+          </SkinProvider>
         </I18nProvider>
       </ThemeProvider>
     </HashRouter>

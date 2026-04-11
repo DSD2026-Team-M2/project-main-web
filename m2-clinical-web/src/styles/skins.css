@@ -1,0 +1,286 @@
+.skin-dev-switcher {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.skin-dev-switcher label {
+  font-size: 12px;
+  color: #475569;
+}
+
+.skin-dev-switcher select {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 3px 8px;
+  background: #fff;
+}
+
+:root[data-skin='neo'] .neo-page {
+  display: grid;
+  gap: 1rem;
+}
+
+:root[data-skin='neo'] .neo-header {
+  padding: 1rem 1.2rem;
+  border-radius: 14px;
+  border: 1px solid #d8e1f2;
+  background: linear-gradient(140deg, #f8fbff, #eef4fb);
+}
+
+:root[data-skin='neo'] .neo-kicker {
+  margin: 0 0 0.3rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+:root[data-skin='neo'] .neo-header h1 {
+  margin: 0 0 0.3rem;
+}
+
+:root[data-skin='neo'] .neo-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+:root[data-skin='neo'] .neo-history-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+:root[data-skin='neo'] .neo-app-shell {
+  min-height: 100vh;
+  background: radial-gradient(circle at top right, #eaf3ff 0%, #dce8f7 52%, #d3e1f3 100%);
+}
+
+:root[data-skin='neo'] .neo-app-topbar {
+  margin: 12px 12px 0;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid #d5e1f5;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(6px);
+}
+
+:root[data-skin='neo'] .neo-app-top-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+:root[data-skin='neo'] .neo-app-top-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+:root[data-skin='neo'] .neo-app-body {
+  display: grid;
+  grid-template-columns: minmax(240px, 270px) 1fr;
+  gap: 12px;
+  padding: 12px;
+}
+
+:root[data-skin='neo'] .neo-app-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+:root[data-skin='neo'] .neo-patient-select-wrap {
+  border: 1px solid #d4e0f3;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 0.8rem;
+}
+
+:root[data-skin='neo'] .neo-app-side .sidebar {
+  width: auto;
+  min-height: 0;
+  border-radius: 12px;
+  padding: 0.95rem 0.8rem;
+}
+
+:root[data-skin='neo'] .neo-app-main {
+  border: 1px solid #d4e0f3;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+:root[data-skin='neo'] .neo-main-content {
+  padding: 1rem 1.1rem 1.5rem;
+}
+
+:root[data-skin='neo'] .neo-clinical-wrap .doctor-clinical-page {
+  color: #334155;
+}
+
+@media (max-width: 980px) {
+  :root[data-skin='neo'] .neo-app-topbar {
+    grid-template-columns: 1fr;
+  }
+
+  :root[data-skin='neo'] .neo-app-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* —— Doctor skin: patient portal layout + light clinical UI —— */
+:root[data-skin='portal'] .doctor-shell-portal .patient-nav-tools {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+:root[data-skin='portal'] .doctor-portal-patient-strip {
+  border-bottom: 1px solid #d7e5ff;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+:root[data-skin='portal'] .doctor-portal-patient-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 1.2rem 0.75rem;
+}
+
+:root[data-skin='portal'] .doctor-portal-patient-select {
+  min-width: 200px;
+  max-width: min(420px, 100%);
+}
+
+:root[data-skin='portal'] .doctor-portal-patient-meta {
+  margin-left: auto;
+}
+
+:root[data-skin='portal'] .doctor-portal-main {
+  padding-bottom: 1.5rem;
+}
+
+/* Re-skin doctor workspace (dark) to patient-portal tokens inside portal shell */
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .page,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page {
+  color: var(--pt-text);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .card,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page .card {
+  background: var(--pt-surface);
+  border: 1px solid var(--pt-border);
+  color: var(--pt-text);
+  box-shadow: 0 4px 16px rgba(13, 63, 173, 0.07);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page h1,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page h1,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .card-title,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page .card-title,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page h2,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page h2,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page h3,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page h3 {
+  color: var(--pt-text);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .muted,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page .muted {
+  color: var(--pt-muted);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .data-table th,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .data-table td {
+  border-bottom-color: var(--pt-border);
+  color: var(--pt-text);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .data-table th {
+  background: var(--pt-primary-soft);
+  color: #234785;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .tag-blue {
+  background: rgba(22, 93, 255, 0.12);
+  color: #165dff;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .tag-gray {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .event-legend {
+  color: var(--pt-muted);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-workspace-page .limb-canvas-host {
+  border-color: var(--pt-border);
+  background: #f8fafc;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doc-panel {
+  border: 1px solid var(--pt-border);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  color: var(--pt-text);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page input,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page select,
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doctor-clinical-page textarea {
+  border: 1px solid var(--pt-border);
+  background: #fff;
+  color: var(--pt-text);
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .doc-highlight {
+  background: rgba(22, 93, 255, 0.08);
+  border: 1px solid rgba(22, 93, 255, 0.22);
+  color: #1d2939;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .risk-green {
+  background: rgba(18, 183, 106, 0.14);
+  color: #0f766e;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .risk-yellow {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .risk-red {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+}
+
+:root[data-skin='portal'] .doctor-portal-content.patient-portal .risk-orange {
+  background: rgba(249, 115, 22, 0.16);
+  color: #c2410c;
+}
+
+@media (max-width: 900px) {
+  :root[data-skin='portal'] .doctor-portal-patient-meta {
+    margin-left: 0;
+    width: 100%;
+  }
+}
