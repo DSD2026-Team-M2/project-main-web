@@ -3,7 +3,6 @@ import type { SkinId } from './skinRegistry'
 
 export function SkinDevSwitcher() {
   const { skinId, setSkinId, skins } = useSkin()
-  if (!import.meta.env.DEV) return null
 
   return (
     <div className="skin-dev-switcher">
