@@ -6,7 +6,6 @@ import type {
   ApiMeasurement,
   ApiSessionRecommendation,
   ApiEngineRecommendation,
-  ApiScheduleItem,
 } from '../types/api'
 import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
@@ -39,32 +38,18 @@ export function SessionDetailPage() {
   const [recsLoading, setRecsLoading] = useState(false)
   const [recsErr, setRecsErr] = useState<string | null>(null)
 
-  // ── schedule / prescription ───────────────────────────────────────────────
-  const [schedule, setSchedule] = useState<ApiScheduleItem[]>([])
-  const [exercise, setExercise] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [duration, setDuration] = useState('30')
-  const [notes, setNotes] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [submitMsg, setSubmitMsg] = useState<{ text: string; ok: boolean } | null>(null)
-
   // ── load ──────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
     setErr(null)
     try {
-      const [m, s] = await Promise.all([
-        patientApiService.listMeasurements(sid),
-        patientApiService.listSchedule(uid),
-      ])
-      setMeasurements(m)
-      setSchedule(s)
+      setMeasurements(await patientApiService.listMeasurements(sid))
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [sid, uid, t])
+  }, [sid, t])
 
   useEffect(() => { void load() }, [load])
 
@@ -90,34 +75,6 @@ export function SessionDetailPage() {
       setRecsErr(e instanceof Error ? e.message : t('loadFailed'))
     } finally {
       setRecsLoading(false)
-    }
-  }
-
-  // ── prescription submit ───────────────────────────────────────────────────
-  async function submitSchedule(e: React.FormEvent) {
-    e.preventDefault()
-    if (!exercise.trim()) {
-      setSubmitMsg({ text: t('sessionPrescriptionRequired'), ok: false })
-      return
-    }
-    setSubmitting(true)
-    setSubmitMsg(null)
-    try {
-      const item = await patientApiService.createScheduleItem({
-        userId: uid,
-        exercise,
-        date,
-        duration: Number(duration) || 30,
-        notes,
-      })
-      setSchedule((prev) => [item, ...prev])
-      setExercise('')
-      setNotes('')
-      setSubmitMsg({ text: t('sessionPrescriptionAdded'), ok: true })
-    } catch (e) {
-      setSubmitMsg({ text: e instanceof Error ? e.message : t('loadFailed'), ok: false })
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -148,13 +105,6 @@ export function SessionDetailPage() {
   const accuracy = measurements.length
     ? Math.round((correctCount / measurements.length) * 100)
     : 0
-
-  function statusLabel(status: string): string {
-    if (status === 'pending')   return t('statusPending')
-    if (status === 'completed') return t('statusCompleted')
-    if (status === 'skipped')   return t('statusSkipped')
-    return status
-  }
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -189,10 +139,10 @@ export function SessionDetailPage() {
             }}
           >
             {[
-              { label: t('sessionMeasurements'), value: measurements.length,              color: 'var(--accent)' },
-              { label: t('sessionCorrect'),      value: correctCount,                     color: '#22c55e'       },
-              { label: t('sessionIncorrect'),    value: measurements.length - correctCount, color: '#ef4444'     },
-              { label: t('sessionAccuracy'),     value: `${accuracy}%`,                  color: 'var(--accent)' },
+              { label: t('sessionMeasurements'), value: measurements.length,               color: 'var(--accent)' },
+              { label: t('sessionCorrect'),       value: correctCount,                      color: '#22c55e'       },
+              { label: t('sessionIncorrect'),     value: measurements.length - correctCount, color: '#ef4444'      },
+              { label: t('sessionAccuracy'),      value: `${accuracy}%`,                   color: 'var(--accent)' },
             ].map((stat) => (
               <div key={stat.label} className="card" style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
                 <div style={{ fontSize: '1.75rem', fontWeight: 700, color: stat.color }}>
@@ -214,7 +164,7 @@ export function SessionDetailPage() {
           </section>
 
           {/* ── AI Recommendations ── */}
-          <section className="card" style={{ marginBottom: '1rem' }}>
+          <section className="card">
             <h2 className="card-title">{t('sessionAiTitle')}</h2>
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
               <button
@@ -223,7 +173,7 @@ export function SessionDetailPage() {
                 disabled={recsLoading}
                 onClick={() => void fetchSessionRecs()}
               >
-                Session Analysis (#{sessionId})
+                {t('sessionAiSessionBtn')} #{sessionId}
               </button>
               <button
                 type="button"
@@ -231,7 +181,7 @@ export function SessionDetailPage() {
                 disabled={recsLoading}
                 onClick={() => void fetchEngineRecs()}
               >
-                Engine #{patientId}
+                {t('sessionAiEngineBtn')} #{patientId}
               </button>
             </div>
 
@@ -241,7 +191,7 @@ export function SessionDetailPage() {
             {sessionRecs != null && (
               <div style={{ marginBottom: engineRecs ? '1rem' : 0 }}>
                 <p className="muted small" style={{ marginBottom: '0.5rem' }}>
-                  Session Recommendations ({sessionRecs.length})
+                  {t('sessionAiSessionLabel')} ({sessionRecs.length})
                 </p>
                 {sessionRecs.length === 0 ? (
                   <p className="muted">{t('sessionAiSessionEmpty')}</p>
@@ -271,7 +221,7 @@ export function SessionDetailPage() {
             {engineRecs != null && (
               <div>
                 <p className="muted small" style={{ marginBottom: '0.5rem' }}>
-                  Engine · {engineRecs.sessions_analysed} sessions · {new Date(engineRecs.generated_at).toLocaleString()}
+                  {t('sessionAiEngineLabel')} · {engineRecs.sessions_analysed} sessions · {new Date(engineRecs.generated_at).toLocaleString()}
                 </p>
                 <div className="task-list">
                   {engineRecs.suggestions.map((s, i) => (
@@ -292,121 +242,6 @@ export function SessionDetailPage() {
                   ))}
                 </div>
               </div>
-            )}
-          </section>
-
-          {/* ── Prescription / Schedule ── */}
-          <section className="card">
-            <h2 className="card-title">{t('sessionScheduleTitle')}</h2>
-
-            <form
-              onSubmit={(e) => void submitSchedule(e)}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '0.75rem',
-                marginBottom: '1rem',
-              }}
-            >
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('navClinical').includes('临床') ? '训练动作 *' : 'Exercise *'}
-                </label>
-                <input
-                  className="patient-select"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  placeholder={t('sessionExercisePh')}
-                  value={exercise}
-                  onChange={(e) => setExercise(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('sessionDate')}
-                </label>
-                <input
-                  type="date"
-                  className="patient-select"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('sessionDuration')}
-                </label>
-                <input
-                  type="number"
-                  className="patient-select"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  value={duration}
-                  min="1"
-                  onChange={(e) => setDuration(e.target.value)}
-                />
-              </div>
-
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('sessionNotes')}
-                </label>
-                <textarea
-                  className="patient-select"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    minHeight: '64px',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    fontSize: 'inherit',
-                  }}
-                  placeholder={t('sessionNotesPh')}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-
-              <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <button type="submit" className="btn primary" disabled={submitting}>
-                  {submitting ? t('sessionSaving') : t('sessionAddPrescription')}
-                </button>
-                {submitMsg && (
-                  <span className="small" style={{ color: submitMsg.ok ? '#22c55e' : '#ef4444' }}>
-                    {submitMsg.text}
-                  </span>
-                )}
-              </div>
-            </form>
-
-            {schedule.length > 0 && (
-              <>
-                <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--fg)' }}>
-                  Patient #{patientId}
-                </h3>
-                <div className="task-list">
-                  {schedule.map((item) => (
-                    <div key={item.id} className="task-row">
-                      <div className="task-main">
-                        <p className="task-title">{item.exercise}</p>
-                        <p className="muted small">
-                          {item.date} · {item.duration} min
-                          {item.notes ? ` · ${item.notes}` : ''}
-                        </p>
-                      </div>
-                      <span
-                        className={`check-state ${
-                          item.status === 'completed' ? 'pass' : item.status === 'skipped' ? 'fail' : 'idle'
-                        }`}
-                      >
-                        {statusLabel(item.status)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
             )}
           </section>
         </>

@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { usePatient } from '../../context/PatientContext'
 import { ClinicalNotes } from '../common/ClinicalNotes'
 import { ErrorBanner } from '../common/ErrorBanner'
@@ -8,6 +8,7 @@ import { LanguageSwitcher } from '../common/LanguageSwitcher'
 import { Sidebar } from './Sidebar'
 import { useI18n } from '../../i18n/I18nContext'
 import { useApiPatientInfo } from '../../hooks/useApiPatientInfo'
+import { authStore } from '../../services/authStore'
 
 export function AppLayout({
   onPatientChange,
@@ -24,6 +25,12 @@ export function AppLayout({
   } = usePatient()
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
+  const navigate = useNavigate()
+
+  function logout() {
+    authStore.clearToken()
+    navigate('/roles')
+  }
 
   return (
     <div className="app-shell">
@@ -85,9 +92,9 @@ export function AppLayout({
                 </Link>
               </>
             ) : (
-              <Link className="btn ghost" to="/roles" aria-label={t('backToRoles')}>
-                {t('backToRoles')}
-              </Link>
+              <button type="button" className="btn ghost" onClick={logout}>
+                {t('logout')}
+              </button>
             )}
             <LanguageSwitcher />
           </div>

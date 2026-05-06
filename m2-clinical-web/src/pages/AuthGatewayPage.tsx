@@ -1,8 +1,20 @@
-import { useMemo, useRef, useState } from 'react'
+﻿import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
 import { useI18n } from '../i18n/I18nContext'
-import { doctorRegistrationStore } from '../services/doctorRegistrationStore'
+import { authStore, type AuthUser } from '../services/authStore'
+
+const BASE_URL = 'http://113.44.220.94:3000'
+
+/**
+ * Hardcoded admin whitelist.
+ * Only these emails are permitted to log in through the admin portal.
+ * All other accounts (clinicians, patients) are rejected even if the
+ * backend returns a valid token, because the backend shares roles.
+ */
+const ADMIN_EMAILS: ReadonlySet<string> = new Set([
+  'admin@v2.dsd',
+])
 
 type RoleKey = 'doctor' | 'admin'
 type AuthMode = 'login' | 'register'
@@ -63,51 +75,93 @@ export function AuthGatewayPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Doctor registration: submit license images for admin approval (demo local storage).
-    if (safeRole === 'doctor' && mode === 'register') {
-      if (!account.trim()) {
-        setMsg(tr('请先填写账号（邮箱/手机号）', 'Please enter an account (email/phone)'))
-        return
-      }
-      if (!displayName.trim()) {
-        setMsg(tr('请先填写显示名称（医生姓名）', 'Please enter display name (doctor name)'))
-        return
-      }
-      if (licenseFiles.length === 0) {
-        setMsg(tr('请上传至少 1 张医生执照图片', 'Please upload at least 1 license image'))
-        return
-      }
-
-      try {
-        setBusy(true)
-        const images = await Promise.all(licenseFiles.map(fileToDataUrl))
-        doctorRegistrationStore.submit({
-          doctorName: displayName,
-          account,
-          licenseImages: images,
-        })
-        setMsg(tr('已提交注册申请，请等待管理员审批。', 'Application submitted. Please wait for admin approval.'))
-        setLicenseFiles([])
-        setLicensePreviews([])
-        return
-      } finally {
-        setBusy(false)
-      }
+    if (!account.trim() || !password.trim()) {
+      setMsg(tr('请填写账号和密码', 'Please enter account and password'))
+      return
     }
 
-    // Demo login/register behavior (no HTTP yet)
-    const verb = mode === 'login' ? t('authLoginSubmit') : t('authRegisterSubmit')
-    setMsg(`${verb}${t('authFakeSuccess')}`)
-    window.setTimeout(() => navigate(targetPath), 700)
+    setBusy(true)
+    try {
+      // ── Register ─────────────────────────────────────────────────────────
+      if (mode === 'register') {
+        // admin portal shows login-only; this guard is a safety net
+        if (safeRole === 'admin') {
+          setMsg(tr('管理员账号无法在此注册，请直接登录。', 'Admin accounts cannot be registered here. Please log in.'))
+          return
+        }
+        if (!displayName.trim()) {
+          setMsg(tr('请填写显示名称（医生姓名）', 'Please enter your display name'))
+          return
+        }
+        if (licenseFiles.length === 0) {
+          setMsg(tr('请上传至少 1 张医生执照图片', 'Please upload at least 1 license image'))
+          return
+        }
+
+        const formData = new FormData()
+        formData.append('name', displayName)
+        formData.append('email', account)
+        formData.append('password', password)
+        formData.append('role', 'clinician')
+        formData.append('license', licenseFiles[0])
+
+        const res = await fetch(`${BASE_URL}/auth/register`, {
+          method: 'POST',
+          body: formData,
+        })
+        if (res.ok) {
+          setMsg(tr('注册申请已提交，请等待管理员审批后再登录。', 'Registration submitted. Please wait for admin approval, then log in.'))
+          setLicenseFiles([])
+          setLicensePreviews([])
+        } else {
+          const body = await res.json().catch(() => ({})) as { error?: string }
+          setMsg(body.error ?? tr(`注册失败 (${res.status})`, `Registration failed (${res.status})`))
+        }
+        return
+      }
+
+      // ── Login ─────────────────────────────────────────────────────────────
+      const res = await fetch(`${BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: account, password }),
+      })
+
+      if (res.ok) {
+        const data = await res.json() as { token: string; user: AuthUser }
+
+        // Admin portal: reject anyone not in the whitelist, even with a valid token.
+        if (safeRole === 'admin' && !ADMIN_EMAILS.has(data.user.email)) {
+          setMsg(tr('该账号无管理员权限，请使用管理员邮箱登录。', 'This account does not have admin access.'))
+          return
+        }
+
+        authStore.setToken(data.token)
+        authStore.setUser(data.user)
+        navigate(targetPath)
+      } else if (res.status === 403) {
+        const body = await res.json().catch(() => ({})) as { error?: string }
+        setMsg(body.error ?? tr('账号正在等待审批，暂时无法登录。', 'Account pending admin approval.'))
+      } else {
+        const body = await res.json().catch(() => ({})) as { error?: string }
+        setMsg(body.error ?? tr(`登录失败 (${res.status})`, `Login failed (${res.status})`))
+      }
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : tr('网络错误，请检查连接。', 'Network error. Please check your connection.'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <div className="role-page portal-page">
       <header className="page-header">
         <div>
-          <h1>{t('authTitle').replace('{role}', roleLabel)}</h1>
-          <p className="muted">{t('authDesc')}</p>
+          <h1>
+            {safeRole === 'admin'
+              ? tr(`${roleLabel} 登录`, `${roleLabel} Login`)
+              : t('authTitle').replace('{role}', roleLabel)}
+          </h1>
         </div>
         <div className="role-actions">
           <Link className="btn ghost" to="/roles">{t('backToRoleEntry')}</Link>
@@ -116,14 +170,16 @@ export function AuthGatewayPage() {
       </header>
 
       <section className="card" style={{ maxWidth: 560 }}>
-        <div className="role-actions" style={{ marginBottom: 12 }}>
-          <button type="button" className={`btn ${mode === 'login' ? 'primary' : 'ghost'}`} onClick={() => setMode('login')}>
-            {t('authLoginTab')}
-          </button>
-          <button type="button" className={`btn ${mode === 'register' ? 'primary' : 'ghost'}`} onClick={() => setMode('register')}>
-            {t('authRegisterTab')}
-          </button>
-        </div>
+        {safeRole !== 'admin' ? (
+          <div className="role-actions" style={{ marginBottom: 12 }}>
+            <button type="button" className={`btn ${mode === 'login' ? 'primary' : 'ghost'}`} onClick={() => setMode('login')}>
+              {t('authLoginTab')}
+            </button>
+            <button type="button" className={`btn ${mode === 'register' ? 'primary' : 'ghost'}`} onClick={() => setMode('register')}>
+              {t('authRegisterTab')}
+            </button>
+          </div>
+        ) : null}
 
         <form onSubmit={onSubmit}>
           {mode === 'register' ? (
@@ -221,9 +277,6 @@ export function AuthGatewayPage() {
             <button type="submit" className="btn primary" disabled={busy}>
               {mode === 'login' ? t('authLoginSubmit') : t('authRegisterSubmit')}
             </button>
-            <button type="button" className="btn ghost" onClick={() => navigate(targetPath)}>
-              {t('authSkip')}
-            </button>
           </div>
         </form>
 
@@ -232,3 +285,4 @@ export function AuthGatewayPage() {
     </div>
   )
 }
+

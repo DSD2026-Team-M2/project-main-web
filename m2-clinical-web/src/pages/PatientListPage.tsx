@@ -6,6 +6,7 @@ import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
 import { useI18n } from '../i18n/I18nContext'
+import { authStore } from '../services/authStore'
 
 export function PatientListPage() {
   const navigate = useNavigate()
@@ -46,7 +47,13 @@ export function PatientListPage() {
           <span style={{ fontWeight: 700, fontSize: '1rem' }}>{t('patientListTitle')}</span>
         </div>
         <div className="patient-row top-right">
-          <Link className="btn ghost" to="/roles">{t('backToRoles')}</Link>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={() => { authStore.clearToken(); navigate('/roles') }}
+          >
+            {t('logout')}
+          </button>
           <LanguageSwitcher />
         </div>
       </header>

@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { usePatient } from '../../context/PatientContext'
 import { ClinicalNotes } from '../../components/common/ClinicalNotes'
 import { ErrorBanner } from '../../components/common/ErrorBanner'
@@ -7,6 +7,7 @@ import { LanguageSwitcher } from '../../components/common/LanguageSwitcher'
 import { ViewShareBar } from '../../components/common/ViewShareBar'
 import { useI18n } from '../../i18n/I18nContext'
 import { useApiPatientInfo } from '../../hooks/useApiPatientInfo'
+import { authStore } from '../../services/authStore'
 
 export function DoctorAppShellDossier({
   onPatientChange,
@@ -23,12 +24,16 @@ export function DoctorAppShellDossier({
   } = usePatient()
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
+  const navigate = useNavigate()
+
+  function logout() {
+    authStore.clearToken()
+    navigate('/roles')
+  }
 
   const navItems = [
     { to: 'sessions',  label: t('navSessions') },
-    { to: 'clinical',  label: t('navClinical') },
-    { to: 'trends',    label: t('navTrends') },
-    { to: 'history',   label: t('navHistory') },
+    // clinical / trends / history temporarily hidden per request
   ] as const
 
   const recordLabel = isApiPatient
@@ -58,9 +63,9 @@ export function DoctorAppShellDossier({
               {t('backToPatients')}
             </Link>
           ) : (
-            <Link className="btn ghost" to="/roles" aria-label={t('backToRoles')}>
-              {t('backToRoles')}
-            </Link>
+            <button type="button" className="btn ghost" onClick={logout}>
+              {t('logout')}
+            </button>
           )}
           <LanguageSwitcher />
         </div>

@@ -7,9 +7,7 @@ export function Sidebar({ patientId }: { patientId: string }) {
   // Patient sub-pages shown in the sidebar (3D is hidden per design)
   const patientItems = [
     { to: `sessions`,  label: t('navSessions') },
-    { to: `clinical`,  label: t('navClinical') },
-    { to: `trends`,    label: t('navTrends') },
-    { to: `history`,   label: t('navHistory') },
+    // clinical / trends / history temporarily hidden per request
   ] as const
 
   return (

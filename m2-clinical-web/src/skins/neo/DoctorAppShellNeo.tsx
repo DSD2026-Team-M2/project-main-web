@@ -1,4 +1,4 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { usePatient } from '../../context/PatientContext'
 import { ClinicalNotes } from '../../components/common/ClinicalNotes'
 import { ErrorBanner } from '../../components/common/ErrorBanner'
@@ -8,6 +8,7 @@ import { ViewShareBar } from '../../components/common/ViewShareBar'
 import { Sidebar } from '../../components/layout/Sidebar'
 import { useI18n } from '../../i18n/I18nContext'
 import { useApiPatientInfo } from '../../hooks/useApiPatientInfo'
+import { authStore } from '../../services/authStore'
 
 export function DoctorAppShellNeo({
   onPatientChange,
@@ -24,6 +25,12 @@ export function DoctorAppShellNeo({
   } = usePatient()
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
+  const navigate = useNavigate()
+
+  function logout() {
+    authStore.clearToken()
+    navigate('/roles')
+  }
 
   const patientLabel = isApiPatient
     ? apiPatientName
@@ -47,9 +54,9 @@ export function DoctorAppShellNeo({
               {t('backToPatients')}
             </Link>
           ) : (
-            <Link className="btn ghost" to="/roles" aria-label={t('backToRoles')}>
-              {t('backToRoles')}
-            </Link>
+            <button type="button" className="btn ghost" onClick={logout}>
+              {t('logout')}
+            </button>
           )}
           <LanguageSwitcher />
         </div>
