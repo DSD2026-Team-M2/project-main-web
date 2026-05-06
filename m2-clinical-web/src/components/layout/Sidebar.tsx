@@ -3,12 +3,15 @@ import { useI18n } from '../../i18n/I18nContext'
 
 export function Sidebar({ patientId }: { patientId: string }) {
   const { t } = useI18n()
-  const items = [
-    { to: 'clinical', label: t('navClinical') },
-    { to: 'trends', label: t('navTrends') },
-    { to: 'history', label: t('navHistory') },
-    { to: 'limb', label: t('navLimb') },
+
+  // Patient sub-pages shown in the sidebar (3D is hidden per design)
+  const patientItems = [
+    { to: `sessions`,  label: t('navSessions') },
+    { to: `clinical`,  label: t('navClinical') },
+    { to: `trends`,    label: t('navTrends') },
+    { to: `history`,   label: t('navHistory') },
   ] as const
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -19,20 +22,27 @@ export function Sidebar({ patientId }: { patientId: string }) {
         </div>
       </div>
       <nav className="nav" aria-label={t('navMain')}>
-        {items.map((it) => (
+        {/* Patient list — always first */}
+        <NavLink
+          to="/doctor/patients"
+          className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+        >
+          {t('navPatientList')}
+        </NavLink>
+
+        {/* Per-patient pages */}
+        {patientItems.map((it) => (
           <NavLink
             key={it.to}
             to={`/doctor/p/${patientId}/${it.to}`}
-            className={({ isActive }) =>
-              `nav-link${isActive ? ' active' : ''}`
-            }
+            className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
           >
             {it.label}
           </NavLink>
         ))}
       </nav>
       <footer className="sidebar-foot muted small">
-        {t('sidebarFooter')} <code>src/services/clinicalApi.ts</code>
+        {t('sidebarFooter')} <code>src/services/</code>
       </footer>
     </aside>
   )

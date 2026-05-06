@@ -62,7 +62,9 @@ export function PatientProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!patients.length) return
-    if (!patients.some((p) => p.id === patientId)) {
+    // Numeric IDs belong to the real API patient list — don't reset them
+    const isApiPatientId = !isNaN(Number(patientId)) && Number(patientId) > 0
+    if (!isApiPatientId && !patients.some((p) => p.id === patientId)) {
       setPatientIdState(patients[0].id)
       try {
         localStorage.setItem(STORAGE_KEY, patients[0].id)

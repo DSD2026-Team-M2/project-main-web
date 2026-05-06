@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local-only scripts (do not commit)
+m2-clinical-web/scripts/*

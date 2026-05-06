@@ -1,21 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import '../styles/devops-console.css'
 import { useI18n } from '../i18n/I18nContext'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
+import {
+  doctorRegistrationStore,
+  type DoctorRegistrationApplication,
+} from '../services/doctorRegistrationStore'
 
 type AdminTab = 'registration' | 'accounts' | 'reports' | 'content'
-type AppStatus = 'pending' | 'approved' | 'rejected'
 type AccountStatus = 'active' | 'disabled'
 
-type DoctorApplication = {
-  id: string
-  name: string
-  specialty: string
-  hospital: string
-  submittedAt: string
-  status: AppStatus
-}
 
 type UserAccount = {
   id: string
@@ -43,12 +38,16 @@ type ContentItem = {
   updatedAt: string
 }
 
-const initialApplications: DoctorApplication[] = [
-  { id: 'app-001', name: '张伟', specialty: '骨科康复', hospital: '市第一人民医院', submittedAt: '2026-05-01', status: 'pending' },
-  { id: 'app-002', name: '李娟', specialty: '神经康复', hospital: '协和医院康复科', submittedAt: '2026-05-02', status: 'pending' },
-  { id: 'app-003', name: '王磊', specialty: 'ACL 术后康复', hospital: '省骨科医院', submittedAt: '2026-04-28', status: 'approved' },
-  { id: 'app-004', name: '陈敏', specialty: '运动医学', hospital: '体育医院', submittedAt: '2026-04-25', status: 'rejected' },
-]
+function mapApplication(app: DoctorRegistrationApplication) {
+  return {
+    id: app.id,
+    name: app.doctorName,
+    account: app.account,
+    submittedAt: app.submittedAt,
+    status: app.status,
+    licenseImages: app.licenseImages,
+  }
+}
 
 const initialAccounts: UserAccount[] = [
   { id: 'u-001', name: '张伟', role: 'doctor', email: 'zhangwei@hospital.cn', status: 'active', joinedAt: '2026-04-28' },
@@ -81,16 +80,29 @@ export function AdminPortalPage() {
   const tr = (zh: string, en: string) => locale === 'zh-CN' ? zh : en
 
   const [activeTab, setActiveTab] = useState<AdminTab>('registration')
-  const [applications, setApplications] = useState(initialApplications)
+  const [applications, setApplications] = useState(() =>
+    doctorRegistrationStore.list().map(mapApplication),
+  )
   const [accounts, setAccounts] = useState(initialAccounts)
   const [feedback, setFeedback] = useState(initialFeedback)
   const [content, setContent] = useState(initialContent)
   const [searchQuery, setSearchQuery] = useState('')
+  const [licenseViewer, setLicenseViewer] = useState<{
+    name: string
+    account: string
+    images: string[]
+  } | null>(null)
   const [auditLogs, setAuditLogs] = useState<string[]>([
     tr('2026-05-05 08:40 [admin] 审批医生注册申请 app-003：通过', '2026-05-05 08:40 [admin] Approved doctor registration app-003'),
     tr('2026-05-04 17:22 [admin] 禁用账号 u-004', '2026-05-04 17:22 [admin] Disabled account u-004'),
     tr('2026-05-03 11:10 [admin] 发布内容 ct-002', '2026-05-03 11:10 [admin] Published content ct-002'),
   ])
+
+  useEffect(() => {
+    return doctorRegistrationStore.subscribe(() => {
+      setApplications(doctorRegistrationStore.list().map(mapApplication))
+    })
+  }, [])
 
   function pushAudit(entry: string) {
     const now = new Date()
@@ -99,7 +111,7 @@ export function AdminPortalPage() {
   }
 
   function reviewApp(id: string, action: 'approved' | 'rejected') {
-    setApplications(prev => prev.map(a => a.id === id ? { ...a, status: action } : a))
+    doctorRegistrationStore.review(id, action)
     pushAudit(tr(
       `${action === 'approved' ? '通过' : '拒绝'}医生注册申请 ${id}`,
       `${action === 'approved' ? 'Approved' : 'Rejected'} doctor registration ${id}`,
@@ -202,10 +214,22 @@ export function AdminPortalPage() {
             {applications.map(app => (
               <article key={app.id} className={`task-row precheck-row ${app.status === 'rejected' ? 'fail' : ''}`}>
                 <div className="task-main">
-                  <p className="task-title">{app.name} <span className="muted small">— {app.specialty}</span></p>
-                  <p className="muted small">{app.hospital} · {tr('提交于', 'Submitted')} {app.submittedAt}</p>
+                  <p className="task-title applicant-name">{app.name}</p>
+                  <p className="muted small">{app.account} · {tr('提交于', 'Submitted')} {app.submittedAt}</p>
                 </div>
                 <div className="role-actions">
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() =>
+                      setLicenseViewer({
+                        name: app.name,
+                        account: app.account,
+                        images: app.licenseImages ?? [],
+                      })}
+                  >
+                    {tr('查看执照', 'View license')}
+                  </button>
                   {app.status === 'pending' ? (
                     <>
                       <button type="button" className="btn primary" onClick={() => reviewApp(app.id, 'approved')}>{tr('通过', 'Approve')}</button>
@@ -221,6 +245,39 @@ export function AdminPortalPage() {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {licenseViewer ? (
+        <div className="entry-modal-mask" role="dialog" aria-modal="true">
+          <div className="entry-modal" style={{ width: 'min(95vw, 860px)' }}>
+            <h3 style={{ margin: 0, color: '#0f2a4e' }}>
+              {tr('医生执照', 'Doctor license')}
+            </h3>
+            <p className="muted small" style={{ marginTop: 6 }}>
+              {licenseViewer.name} · {licenseViewer.account}
+            </p>
+            {licenseViewer.images.length === 0 ? (
+              <p className="muted">{tr('未上传执照图片。', 'No license images uploaded.')}</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
+                {licenseViewer.images.map((src, idx) => (
+                  <a key={`${idx}-${src.slice(0, 18)}`} href={src} target="_blank" rel="noreferrer">
+                    <img
+                      src={src}
+                      alt={tr('执照图片', 'License image')}
+                      style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 12, border: '1px solid #d2def0' }}
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
+            <div className="role-actions" style={{ marginTop: 12 }}>
+              <button type="button" className="btn primary" onClick={() => setLicenseViewer(null)}>
+                {tr('关闭', 'Close')}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {/* ── Accounts & Roles ── */}

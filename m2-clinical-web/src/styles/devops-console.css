@@ -35,6 +35,15 @@
   color: #edf4ff;
 }
 
+.applicant-name {
+  color: #0f2a4e;
+  font-weight: 800;
+}
+
+.devops-console .applicant-name {
+  color: #0f2a4e;
+}
+
 .devops-console .muted,
 .devops-console .small {
   color: var(--dev-muted);

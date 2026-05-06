@@ -6,6 +6,7 @@ import { LoadingBlock } from '../../components/common/LoadingBlock'
 import { LanguageSwitcher } from '../../components/common/LanguageSwitcher'
 import { ViewShareBar } from '../../components/common/ViewShareBar'
 import { useI18n } from '../../i18n/I18nContext'
+import { useApiPatientInfo } from '../../hooks/useApiPatientInfo'
 
 export function DoctorAppShellRadiology({
   onPatientChange,
@@ -21,19 +22,26 @@ export function DoctorAppShellRadiology({
     reloadPatients,
   } = usePatient()
   const { t } = useI18n()
+  const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
 
   const navItems = [
-    { to: 'clinical', label: t('navClinical') },
-    { to: 'trends', label: t('navTrends') },
-    { to: 'history', label: t('navHistory') },
-    { to: 'limb', label: t('navLimb') },
+    { to: 'sessions',  label: t('navSessions') },
+    { to: 'clinical',  label: t('navClinical') },
+    { to: 'trends',    label: t('navTrends') },
+    { to: 'history',   label: t('navHistory') },
   ] as const
 
-  const patientMeta = currentPatient
-    ? `${patientId} · ${currentPatient.diagnosisShort} · ${
-        currentPatient.limbSide === 'left' ? t('sideLeft') : t('sideRight')
-      }`
-    : t('appSubtitle')
+  const displayName = isApiPatient
+    ? apiPatientName
+    : currentPatient?.displayName ?? t('patientLoading')
+
+  const patientMeta = isApiPatient
+    ? `ID ${patientId}`
+    : currentPatient
+      ? `${patientId} · ${currentPatient.diagnosisShort} · ${
+          currentPatient.limbSide === 'left' ? t('sideLeft') : t('sideRight')
+        }`
+      : t('appSubtitle')
 
   return (
     <div className="radiology-shell">
@@ -41,16 +49,20 @@ export function DoctorAppShellRadiology({
         <div className="radiology-header-main">
           <div>
             <p className="radiology-kicker">{t('appTitle')}</p>
-            <h1 className="radiology-title">
-              {currentPatient ? currentPatient.displayName : t('patientLoading')}
-            </h1>
+            <h1 className="radiology-title">{displayName}</h1>
             <p className="radiology-subtitle">{patientMeta}</p>
           </div>
           <div className="radiology-header-tools">
             <ViewShareBar />
-            <Link className="btn ghost" to="/roles" aria-label={t('backToRoles')}>
-              {t('backToRoles')}
+          {isApiPatient ? (
+            <Link className="btn ghost" to="/doctor/patients">
+              {t('backToPatients')}
             </Link>
+          ) : (
+              <Link className="btn ghost" to="/roles" aria-label={t('backToRoles')}>
+                {t('backToRoles')}
+              </Link>
+            )}
             <LanguageSwitcher />
           </div>
         </div>
@@ -72,32 +84,35 @@ export function DoctorAppShellRadiology({
           <section className="radiology-panel radiology-patient-panel">
             <div className="radiology-panel-head">
               <span className="radiology-panel-kicker">{t('patient')}</span>
-              <strong>{currentPatient?.displayName ?? t('patient')}</strong>
+              <strong>{displayName}</strong>
             </div>
 
-            <div className="radiology-field">
-              <label className="muted small" htmlFor="radiology-patient-select">
-                {t('patient')}
-              </label>
-              {loadingList ? (
-                <LoadingBlock label={t('patientLoading')} />
-              ) : listError ? (
-                <ErrorBanner message={listError} onRetry={() => void reloadPatients()} />
-              ) : (
-                <select
-                  id="radiology-patient-select"
-                  className="patient-select radiology-patient-select"
-                  value={patientId}
-                  onChange={(e) => onPatientChange(e.target.value)}
-                >
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.displayName}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
+            {/* Patient selector: only for legacy mock patients */}
+            {!isApiPatient && (
+              <div className="radiology-field">
+                <label className="muted small" htmlFor="radiology-patient-select">
+                  {t('patient')}
+                </label>
+                {loadingList ? (
+                  <LoadingBlock label={t('patientLoading')} />
+                ) : listError ? (
+                  <ErrorBanner message={listError} onRetry={() => void reloadPatients()} />
+                ) : (
+                  <select
+                    id="radiology-patient-select"
+                    className="patient-select radiology-patient-select"
+                    value={patientId}
+                    onChange={(e) => onPatientChange(e.target.value)}
+                  >
+                    {patients.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.displayName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             <dl className="radiology-summary-list">
               <div>
@@ -106,7 +121,7 @@ export function DoctorAppShellRadiology({
               </div>
               <div>
                 <dt>{t('navClinical')}</dt>
-                <dd>{currentPatient?.diagnosisShort ?? '--'}</dd>
+                <dd>{isApiPatient ? '—' : (currentPatient?.diagnosisShort ?? '--')}</dd>
               </div>
               <div>
                 <dt>{t('navHistory')}</dt>

@@ -23,6 +23,9 @@ import {
   DoctorTrendsSkinPage,
 } from './skin-engine/SkinPages'
 import { SkinProvider } from './skin-engine/SkinContext'
+import { PatientListPage } from './pages/PatientListPage'
+import { SessionsListPage } from './pages/SessionsListPage'
+import { SessionDetailPage } from './pages/SessionDetailPage'
 
 const Limb3DPage = lazy(async () => {
   const m = await import('./pages/Limb3DPage')
@@ -30,8 +33,7 @@ const Limb3DPage = lazy(async () => {
 })
 
 function HomeRedirect() {
-  const { patientId } = usePatient()
-  return <Navigate to={`/doctor/p/${patientId}/clinical`} replace />
+  return <Navigate to="/doctor/patients" replace />
 }
 
 function Loading3DFallback() {
@@ -92,12 +94,18 @@ export default function App() {
                 <Route path="/roles" element={<RoleHomePage />} />
                 <Route path="/auth/:role" element={<AuthGatewayPage />} />
                 <Route path="/admin" element={<AdminPortalPage />} />
+                {/* Doctor entry — now goes to patient list */}
                 <Route path="/doctor" element={<HomeRedirect />} />
+                <Route path="/doctor/patients" element={<PatientListPage />} />
+                {/* Patient-specific pages (with sidebar layout) */}
                 <Route path="/doctor/p/:patientId" element={<LayoutWithSync />}>
-                  <Route index element={<Navigate to="clinical" replace />} />
+                  <Route index element={<Navigate to="sessions" replace />} />
+                  <Route path="sessions" element={<SessionsListPage />} />
+                  <Route path="session/:sessionId" element={<SessionDetailPage />} />
                   <Route path="clinical" element={<DoctorClinicalSkinPage />} />
                   <Route path="trends" element={<DoctorTrendsSkinPage />} />
                   <Route path="history" element={<DoctorHistorySkinPage />} />
+                  {/* 3D reconstruction: route kept but hidden from navigation */}
                   <Route
                     path="limb"
                     element={
@@ -107,8 +115,11 @@ export default function App() {
                     }
                   />
                 </Route>
+                {/* Legacy short-form routes */}
                 <Route path="/p/:patientId" element={<LayoutWithSync />}>
                   <Route index element={<Navigate to="clinical" replace />} />
+                  <Route path="sessions" element={<SessionsListPage />} />
+                  <Route path="session/:sessionId" element={<SessionDetailPage />} />
                   <Route path="clinical" element={<DoctorClinicalSkinPage />} />
                   <Route path="trends" element={<DoctorTrendsSkinPage />} />
                   <Route path="history" element={<DoctorHistorySkinPage />} />
