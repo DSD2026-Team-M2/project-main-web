@@ -1,4 +1,4 @@
-.role-entry-page {
+﻿.role-entry-page {
   --entry-bg: #f2f6fb;
   --entry-bg-2: #e9f0f8;
   --entry-main: #2b6fdf;
@@ -110,7 +110,7 @@
   border: 1px solid #b8dbde;
 }
 
-.role-entry-card.developer {
+.role-entry-card.admin {
   background: linear-gradient(155deg, #e9f3ff, #e3eeff);
   border: 1px solid #b4c8eb;
 }
@@ -133,7 +133,7 @@
   background: linear-gradient(130deg, #2f9b9e, #4eaec0);
 }
 
-.developer .role-icon-wrap {
+.admin .role-icon-wrap {
   background: linear-gradient(130deg, #1b4fd4, #14a9e6);
 }
 
@@ -160,7 +160,7 @@
   color: #1f6f78;
 }
 
-.developer .role-en {
+.admin .role-en {
   color: #1f4d9c;
 }
 
@@ -199,7 +199,7 @@
   color: #236d6f;
 }
 
-.developer .role-keywords span {
+.admin .role-keywords span {
   background: #dce8fb;
   color: #1d4d9d;
 }
@@ -221,7 +221,7 @@
   background: linear-gradient(130deg, #2d9ca2, #47b9c0);
 }
 
-.developer .role-entry-btn {
+.admin .role-entry-btn {
   background: linear-gradient(130deg, #1d5ad8, #17a5e5);
 }
 
@@ -292,7 +292,7 @@
   color: #217276;
 }
 
-.entry-modal.developer h3 {
+.entry-modal.admin h3 {
   color: #1f4d9f;
 }
 

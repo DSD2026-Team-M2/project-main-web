@@ -10,19 +10,10 @@ import {
 import { lazy, Suspense, useEffect } from 'react'
 import { PatientProvider, usePatient } from './context/PatientContext'
 import { LoadingBlock } from './components/common/LoadingBlock'
-import { PatientPortalPage } from './pages/PatientPortalPage'
-import { DeveloperPortalPage } from './pages/DeveloperPortalPage'
+import { AdminPortalPage } from './pages/AdminPortalPage'
 import { RoleHomePage } from './pages/RoleHomePage'
 import { I18nProvider, useI18n } from './i18n/I18nContext'
 import { ThemeProvider, useTheme } from './theme/ThemeContext'
-import { PatientPortalLayout } from './components/layout/PatientPortalLayout'
-import { PatientPortalProvider } from './context/PatientPortalContext'
-import { PatientTrainingPlanPage } from './pages/PatientTrainingPlanPage'
-import { PatientTrainingDetailPage } from './pages/PatientTrainingDetailPage'
-import { PatientRecoveryDataPage } from './pages/PatientRecoveryDataPage'
-import { PatientFollowUpPage } from './pages/PatientFollowUpPage'
-import { PatientLimb3DViewPage } from './pages/PatientLimb3DViewPage'
-import { PatientProfilePage } from './pages/PatientProfilePage'
 import { AuthGatewayPage } from './pages/AuthGatewayPage'
 import { SkinDevSwitcher } from './skin-engine/SkinDevSwitcher'
 import {
@@ -76,12 +67,7 @@ function RouteThemeSync() {
   const { setRoleTheme } = useTheme()
 
   useEffect(() => {
-    if (location.pathname.startsWith('/patient')) {
-      setRoleTheme('patient')
-      return
-    }
-
-    if (location.pathname.startsWith('/developer')) {
+    if (location.pathname.startsWith('/admin')) {
       setRoleTheme('admin')
       return
     }
@@ -90,14 +76,6 @@ function RouteThemeSync() {
   }, [location.pathname, setRoleTheme])
 
   return null
-}
-
-function PatientPortalRoot() {
-  return (
-    <PatientPortalProvider>
-      <PatientPortalLayout />
-    </PatientPortalProvider>
-  )
 }
 
 export default function App() {
@@ -113,18 +91,7 @@ export default function App() {
                 <Route path="/" element={<HomeRedirect />} />
                 <Route path="/roles" element={<RoleHomePage />} />
                 <Route path="/auth/:role" element={<AuthGatewayPage />} />
-                <Route path="/patient" element={<Navigate to="/patient/home" replace />} />
-                <Route path="/patient/*" element={<PatientPortalRoot />}>
-                  <Route path="home" element={<PatientPortalPage />} />
-                  <Route path="training" element={<PatientTrainingPlanPage />} />
-                  <Route path="training/:taskId" element={<PatientTrainingDetailPage />} />
-                  <Route path="recovery" element={<PatientRecoveryDataPage />} />
-                  <Route path="follow-up" element={<PatientFollowUpPage />} />
-                  <Route path="limb-3d" element={<PatientLimb3DViewPage />} />
-                  <Route path="profile" element={<PatientProfilePage />} />
-                  <Route path="*" element={<Navigate to="/patient/home" replace />} />
-                </Route>
-                <Route path="/developer" element={<DeveloperPortalPage />} />
+                <Route path="/admin" element={<AdminPortalPage />} />
                 <Route path="/doctor" element={<HomeRedirect />} />
                 <Route path="/doctor/p/:patientId" element={<LayoutWithSync />}>
                   <Route index element={<Navigate to="clinical" replace />} />

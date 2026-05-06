@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 
-export type RoleTheme = 'doctor' | 'patient' | 'admin'
+export type RoleTheme = 'doctor' | 'admin'
 export type UiVersion = 'v1' | 'v2'
 
 type ThemeContextValue = {
@@ -24,7 +24,7 @@ const VERSION_KEY = 'm2.ui-version'
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 function isRoleTheme(value: string | null): value is RoleTheme {
-  return value === 'doctor' || value === 'patient' || value === 'admin'
+  return value === 'doctor' || value === 'admin'
 }
 
 function isUiVersion(value: string | null): value is UiVersion {

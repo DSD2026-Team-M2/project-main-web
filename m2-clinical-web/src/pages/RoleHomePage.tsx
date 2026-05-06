@@ -4,7 +4,7 @@ import '../styles/role-entry.css'
 import { useI18n } from '../i18n/I18nContext'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
 
-type RoleKey = 'doctor' | 'patient' | 'developer'
+type RoleKey = 'doctor' | 'admin'
 
 type RoleCard = {
   key: RoleKey
@@ -31,22 +31,13 @@ export function RoleHomePage() {
       action: t('roleDoctorAction'),
     },
     {
-      key: 'patient',
-      title: t('rolePatient'),
-      subtitle: t('rolePatientSubtitle'),
-      desc: t('rolePatientDesc'),
-      points: [t('patientNavTraining'), t('patientNavRecovery'), t('patientNavFollowUp')],
-      route: '/auth/patient',
-      action: t('rolePatientAction'),
-    },
-    {
-      key: 'developer',
-      title: t('roleDev'),
-      subtitle: t('roleDevSubtitle'),
-      desc: t('roleDevDesc'),
-      points: [t('roleDevKeyword1'), t('roleDevKeyword2'), t('roleDevKeyword3')],
-      route: '/auth/developer',
-      action: t('roleDevAction'),
+      key: 'admin',
+      title: t('roleAdmin'),
+      subtitle: t('roleAdminSubtitle'),
+      desc: t('roleAdminDesc'),
+      points: [t('roleAdminKeyword1'), t('roleAdminKeyword2'), t('roleAdminKeyword3')],
+      route: '/auth/admin',
+      action: t('roleAdminAction'),
     },
   ]
 
@@ -72,7 +63,7 @@ export function RoleHomePage() {
         {roleCards.map((card, idx) => (
           <article key={card.key} className={`card role-entry-card ${card.key}`} style={{ animationDelay: `${idx * 90}ms` }}>
             <div className="role-icon-wrap" aria-hidden="true">
-              <span className="role-icon-core">{card.key === 'doctor' ? 'DR' : card.key === 'patient' ? 'PT' : 'DEV'}</span>
+              <span className="role-icon-core">{card.key === 'doctor' ? 'DR' : 'ADM'}</span>
             </div>
             <p className="role-en">{card.subtitle}</p>
             <h2 className="card-title">{card.title}</h2>

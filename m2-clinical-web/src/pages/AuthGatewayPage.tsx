@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
 import { useI18n } from '../i18n/I18nContext'
 
-type RoleKey = 'doctor' | 'patient' | 'developer'
+type RoleKey = 'doctor' | 'admin'
 type AuthMode = 'login' | 'register'
 
 export function AuthGatewayPage() {
@@ -16,18 +16,13 @@ export function AuthGatewayPage() {
   const [displayName, setDisplayName] = useState('')
   const [msg, setMsg] = useState('')
 
-  const safeRole: RoleKey = role === 'patient' || role === 'developer' ? role : 'doctor'
+  const safeRole: RoleKey = role === 'admin' ? 'admin' : 'doctor'
   const roleLabel = useMemo(
-    () =>
-      safeRole === 'doctor'
-        ? t('roleDoctor')
-        : safeRole === 'patient'
-          ? t('rolePatient')
-          : t('roleDev'),
+    () => (safeRole === 'doctor' ? t('roleDoctor') : t('roleAdmin')),
     [safeRole, t],
   )
 
-  const targetPath = safeRole === 'doctor' ? '/doctor' : safeRole === 'patient' ? '/patient' : '/developer'
+  const targetPath = safeRole === 'doctor' ? '/doctor' : '/admin'
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
