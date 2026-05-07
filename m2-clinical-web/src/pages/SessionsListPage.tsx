@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import { patientApiService } from '../services/patientApiService'
@@ -19,6 +19,12 @@ export function SessionsListPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
 
+  // ── session filter ─────────────────────────────────────────────────────────
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const startPickerRef = useRef<HTMLInputElement | null>(null)
+  const endPickerRef = useRef<HTMLInputElement | null>(null)
+
   // ── prescription state ────────────────────────────────────────────────────
   const [schedule, setSchedule] = useState<ApiScheduleItem[]>([])
   const [exercise, setExercise] = useState('')
@@ -37,16 +43,28 @@ export function SessionsListPage() {
         patientApiService.listSessions(uid),
         patientApiService.listSchedule(uid),
       ])
-      setSessions(sess)
+      const filtered = sess.filter((s) => {
+        const d = s.started_at.slice(0, 10)
+        if (startDate && d < startDate) return false
+        if (endDate && d > endDate) return false
+        return true
+      })
+      const sorted = [...filtered].sort(
+        (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
+      )
+      setSessions(sorted)
       setSchedule(sched)
-      const ms = await Promise.all(sess.map((s) => patientApiService.listMeasurements(s.id)))
-      setAllMeasurements(ms)
+      const ms = await Promise.all(
+        sorted.map((s) => patientApiService.listMeasurements(s.id, { startDate, endDate })),
+      )
+      // Defensive: backend may return non-array; never allow undefined to crash charts.
+      setAllMeasurements(ms.map((x) => (Array.isArray(x) ? x : [])))
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [uid, t])
+  }, [uid, t, startDate, endDate])
 
   useEffect(() => { void load() }, [load])
 
@@ -55,9 +73,16 @@ export function SessionsListPage() {
     if (sessions.length === 0 || allMeasurements.length === 0) return null
 
     const jointIds = new Set<string>()
-    allMeasurements.forEach((ms) =>
-      ms.forEach((m) => m.joint_angles.forEach((j) => jointIds.add(j.angleID))),
-    )
+    allMeasurements.forEach((ms) => {
+      if (!Array.isArray(ms)) return
+      ms.forEach((m) => {
+        const angles = (m as any)?.targetAngles
+        if (!Array.isArray(angles)) return
+        angles.forEach((j) => {
+          if (j?.angleID) jointIds.add(String(j.angleID))
+        })
+      })
+    })
     if (jointIds.size === 0) return null
 
     // X labels: "Session #N\nYYYY-MM-DD"
@@ -70,9 +95,12 @@ export function SessionsListPage() {
       symbol: 'circle',
       symbolSize: 6,
       data: allMeasurements.map((ms) => {
-        const angles = ms.flatMap((m) =>
-          m.joint_angles.filter((j) => j.angleID === joint).map((j) => j.angle),
-        )
+        if (!Array.isArray(ms)) return null
+        const angles = ms.flatMap((m: any) => {
+          const ta = m?.targetAngles
+          if (!Array.isArray(ta)) return []
+          return ta.filter((j: any) => j?.angleID === joint).map((j: any) => Number(j?.angle))
+        }).filter((n) => Number.isFinite(n))
         return angles.length
           ? parseFloat((angles.reduce((a, b) => a + b, 0) / angles.length).toFixed(1))
           : null
@@ -92,6 +120,14 @@ export function SessionsListPage() {
       series,
     }
   }, [sessions, allMeasurements])
+
+  // Sessions list should show newest on top, but keep chart order (old→new).
+  const sessionsForList = useMemo(() => {
+    return sessions
+      .map((s, idx) => ({ s, seq: idx + 1 }))
+      .slice()
+      .reverse()
+  }, [sessions])
 
   // ── helpers ───────────────────────────────────────────────────────────────
   function formatDuration(start: string, end: string | null): string {
@@ -155,6 +191,66 @@ export function SessionsListPage() {
         </section>
       ) : (
         <>
+          {/* ── Date range filter ── */}
+          <section className="card" style={{ marginBottom: '1rem' }}>
+            <div className="role-actions" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
+              <label className="muted small">
+                {t('dateFilterStart')}
+                <span style={{ position: 'relative', display: 'inline-block', marginLeft: 8 }}>
+                  {/* Visible input (prevents locale placeholder like yyyy/mm/日) */}
+                  <input
+                    type="text"
+                    readOnly
+                    className="patient-select"
+                    value={startDate}
+                    placeholder="YYYY-MM-DD"
+                    onClick={() => (startPickerRef.current as any)?.showPicker?.() ?? startPickerRef.current?.focus()}
+                    style={{ width: 160 }}
+                  />
+                  {/* Hidden native date picker */}
+                  <input
+                    ref={startPickerRef}
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                </span>
+              </label>
+              <label className="muted small">
+                {t('dateFilterEnd')}
+                <span style={{ position: 'relative', display: 'inline-block', marginLeft: 8 }}>
+                  <input
+                    type="text"
+                    readOnly
+                    className="patient-select"
+                    value={endDate}
+                    placeholder="YYYY-MM-DD"
+                    onClick={() => (endPickerRef.current as any)?.showPicker?.() ?? endPickerRef.current?.focus()}
+                    style={{ width: 160 }}
+                  />
+                  <input
+                    ref={endPickerRef}
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                </span>
+              </label>
+              <button type="button" className="btn ghost" onClick={() => { setStartDate(''); setEndDate('') }}>
+                {t('dateFilterClear')}
+              </button>
+              <button type="button" className="btn primary" onClick={() => void load()}>
+                {t('dateFilterApply')}
+              </button>
+            </div>
+          </section>
+
           {/* ── Cross-session Trend Chart ── */}
           {trendOption ? (
             <section className="card" style={{ marginBottom: '1rem' }}>
@@ -170,7 +266,7 @@ export function SessionsListPage() {
               <p className="muted">{t('sessionsEmpty')}</p>
             ) : (
               <div className="task-list">
-                {sessions.map((s, i) => (
+                {sessionsForList.map(({ s, seq }) => (
                   <article
                     key={s.id}
                     className="task-row"
@@ -178,7 +274,7 @@ export function SessionsListPage() {
                     onClick={() => navigate(`/doctor/p/${patientId}/session/${s.id}`)}
                   >
                     <div className="task-main">
-                      <p className="task-title">Session #{i + 1}</p>
+                      <p className="task-title">Session #{seq}</p>
                       <p className="muted small">
                         {new Date(s.started_at).toLocaleString()}
                         {' · '}

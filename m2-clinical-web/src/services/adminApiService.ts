@@ -3,7 +3,7 @@
  * Requires a valid admin JWT (stored via authStore).
  */
 
-import type { ApiPatient } from '../types/api'
+import type { ApiPatient, ApiSession } from '../types/api'
 import { authStore } from './authStore'
 
 const BASE_URL = 'http://113.44.220.94:3000'
@@ -50,6 +50,16 @@ export const adminApiService = {
   async listPendingClinicians(): Promise<ApiPatient[]> {
     const users = await adminApiService.listAllUsers()
     return users.filter((u) => u.role === 'clinician' && u.status === 'pending')
+  },
+
+  /** GET /patients — all users with role=patient */
+  async listPatients(): Promise<ApiPatient[]> {
+    return adminFetch<ApiPatient[]>('/patients')
+  },
+
+  /** GET /sessions — list all sessions (admin) */
+  async listAllSessions(): Promise<ApiSession[]> {
+    return adminFetch<ApiSession[]>('/sessions')
   },
 
   /** PATCH /auth/approve/:userId */

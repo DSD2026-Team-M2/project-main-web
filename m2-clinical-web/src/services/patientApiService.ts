@@ -49,9 +49,13 @@ export const patientApiService = {
     return apiFetch<ApiSession[]>(`/sessions?userId=${userId}`)
   },
 
-  // GET /measurements/:sessionId
-  async listMeasurements(sessionId: number): Promise<ApiMeasurement[]> {
-    return apiFetch<ApiMeasurement[]>(`/measurements/${sessionId}`)
+  // GET /measurements/:sessionId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+  async listMeasurements(sessionId: number, range?: { startDate?: string; endDate?: string }): Promise<ApiMeasurement[]> {
+    const qs = new URLSearchParams()
+    if (range?.startDate) qs.set('startDate', range.startDate)
+    if (range?.endDate) qs.set('endDate', range.endDate)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return apiFetch<ApiMeasurement[]>(`/measurements/${sessionId}${suffix}`)
   },
 
   // GET /recommendations/session/:sessionId
@@ -91,7 +95,7 @@ export const patientApiService = {
     // Collect all joint IDs
     const jointIds = new Set<string>()
     allMeasurements.forEach((ms) =>
-      ms.forEach((m) => m.joint_angles.forEach((j) => jointIds.add(j.angleID))),
+      ms.forEach((m) => m.targetAngles.forEach((j) => jointIds.add(j.angleID))),
     )
 
     // Build series: one per joint, points indexed by session order
@@ -100,7 +104,7 @@ export const patientApiService = {
       points: sessions.map((session, idx) => {
         const ms = allMeasurements[idx]
         const angles = ms.flatMap((m) =>
-          m.joint_angles.filter((j) => j.angleID === joint).map((j) => j.angle),
+          m.targetAngles.filter((j) => j.angleID === joint).map((j) => j.angle),
         )
         const avg = angles.length ? angles.reduce((a, b) => a + b, 0) / angles.length : 0
         return {
@@ -128,7 +132,7 @@ export const patientApiService = {
       // Compute average for each joint across this session's measurements
       const jointMap = new Map<string, number[]>()
       ms.forEach((m) =>
-        m.joint_angles.forEach((j) => {
+        m.targetAngles.forEach((j) => {
           if (!jointMap.has(j.angleID)) jointMap.set(j.angleID, [])
           jointMap.get(j.angleID)!.push(j.angle)
         }),
@@ -138,17 +142,12 @@ export const patientApiService = {
         metrics[joint] = { value: parseFloat(avg.toFixed(1)), unit: '°', source: 'measured' }
       })
 
-      // Add accuracy as a pseudo-metric
-      const correct = ms.filter((m) => m.is_correct).length
-      const accuracy = ms.length ? Math.round((correct / ms.length) * 100) : 0
-      metrics['accuracy'] = { value: accuracy, unit: '%', source: 'measured' }
-
       return {
         id: String(session.id),
         t: session.started_at.slice(0, 10),
         type: 'training',
         title: `Session #${session.id}`,
-        summary: `${ms.length} measurements · ${accuracy}% accuracy`,
+        summary: `${ms.length} measurements`,
         metrics,
       }
     })

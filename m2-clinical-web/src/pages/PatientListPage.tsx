@@ -11,6 +11,7 @@ import { authStore } from '../services/authStore'
 export function PatientListPage() {
   const navigate = useNavigate()
   const { t } = useI18n()
+  const me = authStore.getUser()
   const [patients, setPatients] = useState<ApiPatient[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -46,7 +47,12 @@ export function PatientListPage() {
           <span className="brand-mark" style={{ marginRight: '0.5rem' }}>M2</span>
           <span style={{ fontWeight: 700, fontSize: '1rem' }}>{t('patientListTitle')}</span>
         </div>
-        <div className="patient-row top-right">
+        {/* keep grid layout consistent with other pages */}
+        <div className="patient-row top-center" />
+        <div className="patient-row top-right" style={{ justifyContent: 'flex-end', gap: 10 }}>
+          <span className="muted small" style={{ fontWeight: 700 }}>
+            👨‍⚕️ {me?.name ?? 'Doctor'}
+          </span>
           <button
             type="button"
             className="btn ghost"

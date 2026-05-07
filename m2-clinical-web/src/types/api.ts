@@ -27,10 +27,10 @@ export type ApiJointAngle = {
 
 export type ApiMeasurement = {
   id: number
-  session_id: number
-  timestamp: string
-  joint_angles: ApiJointAngle[]
-  is_correct: boolean
+  sessionId: number
+  targetAngles: ApiJointAngle[]
+  errors: unknown[]
+  sensorData: unknown[]
 }
 
 export type ApiSessionRecommendation = {

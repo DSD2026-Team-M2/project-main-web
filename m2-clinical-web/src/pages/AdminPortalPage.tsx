@@ -3,12 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import '../styles/devops-console.css'
 import { useI18n } from '../i18n/I18nContext'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
-import {
-  doctorRegistrationStore,
-  type DoctorRegistrationApplication,
-} from '../services/doctorRegistrationStore'
 import { adminApiService } from '../services/adminApiService'
-import type { ApiPatient } from '../types/api'
+import type { ApiPatient, ApiSession } from '../types/api'
 import { authStore } from '../services/authStore'
 
 type AdminTab = 'registration' | 'accounts' | 'reports' | 'content'
@@ -41,17 +37,6 @@ type ContentItem = {
   updatedAt: string
 }
 
-function mapApplication(app: DoctorRegistrationApplication) {
-  return {
-    id: app.id,
-    name: app.doctorName,
-    account: app.account,
-    submittedAt: app.submittedAt,
-    status: app.status,
-    licenseImages: app.licenseImages,
-  }
-}
-
 const initialAccounts: UserAccount[] = [
   { id: 'u-001', name: '张伟', role: 'doctor', email: 'zhangwei@hospital.cn', status: 'active', joinedAt: '2026-04-28' },
   { id: 'u-002', name: '李娟', role: 'doctor', email: 'lijuan@rehab.cn', status: 'active', joinedAt: '2026-04-30' },
@@ -71,13 +56,6 @@ const initialContent: ContentItem[] = [
   { id: 'ct-003', title: '新功能上线通知', type: 'notification', status: 'published', updatedAt: '2026-04-28' },
 ]
 
-const usageStats = {
-  totalDoctors: 48,
-  activeSessions: 12,
-  patientsTracked: 234,
-  avgSessionMin: 18,
-}
-
 export function AdminPortalPage() {
   const { t, locale } = useI18n()
   const tr = (zh: string, en: string) => locale === 'zh-CN' ? zh : en
@@ -89,12 +67,14 @@ export function AdminPortalPage() {
   }
 
   const [activeTab, setActiveTab] = useState<AdminTab>('registration')
-  const [applications, setApplications] = useState(() =>
-    doctorRegistrationStore.list().map(mapApplication),
-  )
   const [apiPending, setApiPending] = useState<ApiPatient[]>([])
   const [apiPendingLoading, setApiPendingLoading] = useState(false)
   const [apiPendingErr, setApiPendingErr] = useState('')
+  const [stats, setStats] = useState<{ activeDoctors: number; patientsTracked: number; activeSessions: number }>({
+    activeDoctors: 0,
+    patientsTracked: 0,
+    activeSessions: 0,
+  })
   const [accounts, setAccounts] = useState(initialAccounts)
   const [feedback, setFeedback] = useState(initialFeedback)
   const [content, setContent] = useState(initialContent)
@@ -111,18 +91,26 @@ export function AdminPortalPage() {
     tr('2026-05-03 11:10 [admin] 发布内容 ct-002', '2026-05-03 11:10 [admin] Published content ct-002'),
   ])
 
-  useEffect(() => {
-    return doctorRegistrationStore.subscribe(() => {
-      setApplications(doctorRegistrationStore.list().map(mapApplication))
-    })
-  }, [])
-
   // Load API-side pending clinicians on first render
   useEffect(() => {
     setApiPendingLoading(true)
-    adminApiService
-      .listPendingClinicians()
-      .then((list) => { setApiPending(list); setApiPendingErr('') })
+    Promise.all([
+      adminApiService.listPendingClinicians(),
+      adminApiService.listAllUsers(),
+      adminApiService.listPatients(),
+      adminApiService.listAllSessions(),
+    ])
+      .then(([pending, users, patients, sessions]) => {
+        setApiPending(pending)
+        setApiPendingErr('')
+        const activeDoctors = users.filter((u) => u.role === 'clinician' && u.status === 'active').length
+        const activeSessions = (sessions as ApiSession[]).filter((s) => s.ended_at == null).length
+        setStats({
+          activeDoctors,
+          patientsTracked: patients.length,
+          activeSessions,
+        })
+      })
       .catch((err: unknown) => setApiPendingErr(err instanceof Error ? err.message : String(err)))
       .finally(() => setApiPendingLoading(false))
   }, [])
@@ -131,14 +119,6 @@ export function AdminPortalPage() {
     const now = new Date()
     const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     setAuditLogs(prev => [`${ts} [admin] ${entry}`, ...prev.slice(0, 19)])
-  }
-
-  function reviewApp(id: string, action: 'approved' | 'rejected') {
-    doctorRegistrationStore.review(id, action)
-    pushAudit(tr(
-      `${action === 'approved' ? '通过' : '拒绝'}医生注册申请 ${id}`,
-      `${action === 'approved' ? 'Approved' : 'Rejected'} doctor registration ${id}`,
-    ))
   }
 
   async function approveApiClinician(user: ApiPatient) {
@@ -234,7 +214,7 @@ export function AdminPortalPage() {
     !searchQuery || a.name.includes(searchQuery) || a.email.includes(searchQuery) || a.role.includes(searchQuery)
   )
 
-  const pendingCount = applications.filter(a => a.status === 'pending').length + apiPending.length
+  const pendingCount = apiPending.length
   const unresolvedCount = feedback.filter(f => !f.resolved).length
 
   const tabs: Array<{ key: AdminTab; label: string; badge?: number }> = [
@@ -256,15 +236,14 @@ export function AdminPortalPage() {
           )}</p>
           <div className="hero-chips">
             <span className="hero-chip">{tr(`待审申请 ${pendingCount}`, `${pendingCount} pending`)}</span>
-            <span className="hero-chip">{tr(`活跃医生 ${usageStats.totalDoctors}`, `${usageStats.totalDoctors} doctors`)}</span>
+            <span className="hero-chip">{tr(`活跃医生 ${stats.activeDoctors}`, `${stats.activeDoctors} doctors`)}</span>
             <span className="hero-chip">{tr(`未处理反馈 ${unresolvedCount}`, `${unresolvedCount} unresolved`)}</span>
           </div>
         </div>
         <div className="hero-side">
           <p className="muted small">{tr('跟踪患者', 'Patients tracked')}</p>
-          <p className="hero-id">{usageStats.patientsTracked}</p>
-          <p className="muted small">{tr('在线会话', 'Active sessions')}: {usageStats.activeSessions}</p>
-          <p className="muted small">{tr('平均时长', 'Avg session')}: {usageStats.avgSessionMin} {tr('分钟', 'min')}</p>
+          <p className="hero-id">{stats.patientsTracked}</p>
+          <p className="muted small">{tr('在线会话', 'Active sessions')}: {stats.activeSessions}</p>
           <div className="role-actions" style={{ marginTop: '0.6rem' }}>
             <button type="button" className="btn ghost role-link" onClick={logout}>{t('logout')}</button>
             <LanguageSwitcher />
@@ -293,11 +272,11 @@ export function AdminPortalPage() {
       {activeTab === 'registration' ? (
         <section className="card">
           <h2 className="card-title">{tr('医生注册申请审核', 'Doctor Registration Applications')}</h2>
-          <p className="muted small">{tr('审阅执照与资质，通过或拒绝后系统自动通知申请医生。', 'Review license and credentials; system notifies the applicant upon decision.')}</p>
+          <p className="muted small">{tr('审阅执照与资质。', 'Review license and credentials.')}</p>
           {/* ── API-side pending clinicians ── */}
           <div style={{ marginTop: '1rem' }}>
             <p className="small muted" style={{ marginBottom: '0.5rem', fontWeight: 600 }}>
-              {tr('来自 API 的待审批注册', 'Pending registrations from API')}
+              {tr('待审批注册', 'Pending registrations')}
             </p>
             {apiPendingLoading ? (
               <p className="muted small">{tr('加载中…', 'Loading…')}</p>
@@ -340,45 +319,6 @@ export function AdminPortalPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* ── Local (demo) pending applications ── */}
-          <p className="small muted" style={{ marginTop: '1.2rem', marginBottom: '0.5rem', fontWeight: 600 }}>
-            {tr('本地演示注册申请', 'Local demo registrations')}
-          </p>
-          <div className="task-list">
-            {applications.map(app => (
-              <article key={app.id} className={`task-row precheck-row ${app.status === 'rejected' ? 'fail' : ''}`}>
-                <div className="task-main">
-                  <p className="task-title applicant-name">{app.name}</p>
-                  <p className="muted small">{app.account} · {tr('提交于', 'Submitted')} {app.submittedAt}</p>
-                </div>
-                <div className="role-actions">
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() =>
-                      setLicenseViewer({
-                        name: app.name,
-                        account: app.account,
-                        images: app.licenseImages ?? [],
-                      })}
-                  >
-                    {tr('查看执照', 'View license')}
-                  </button>
-                  {app.status === 'pending' ? (
-                    <>
-                      <button type="button" className="btn primary" onClick={() => reviewApp(app.id, 'approved')}>{tr('通过', 'Approve')}</button>
-                      <button type="button" className="btn ghost" onClick={() => reviewApp(app.id, 'rejected')}>{tr('拒绝', 'Reject')}</button>
-                    </>
-                  ) : (
-                    <span className={`check-state ${app.status === 'approved' ? 'pass' : 'fail'}`}>
-                      {app.status === 'approved' ? tr('已通过', 'Approved') : tr('已拒绝', 'Rejected')}
-                    </span>
-                  )}
-                </div>
-              </article>
-            ))}
           </div>
         </section>
       ) : null}
@@ -473,10 +413,9 @@ export function AdminPortalPage() {
         <>
           <section className="portal-kpi-grid premium-grid">
             {([
-              { label: tr('注册医生总数', 'Total Doctors'), value: usageStats.totalDoctors, foot: tr('较上月 +6', '+6 vs last month') },
-              { label: tr('在线会话数', 'Active Sessions'), value: usageStats.activeSessions, foot: tr('当前实时', 'Real-time') },
-              { label: tr('跟踪患者数', 'Patients Tracked'), value: usageStats.patientsTracked, foot: tr('所有医生合计', 'All doctors combined') },
-              { label: tr('平均会话时长', 'Avg Session Duration'), value: `${usageStats.avgSessionMin} ${tr('分钟', 'min')}`, foot: tr('近 30 天', 'Last 30 days') },
+              { label: tr('活跃医生数', 'Active Doctors'), value: stats.activeDoctors, foot: tr('实时统计', 'Real-time') },
+              { label: tr('在线会话数', 'Active Sessions'), value: stats.activeSessions, foot: tr('实时统计', 'Real-time') },
+              { label: tr('跟踪患者数', 'Patients Tracked'), value: stats.patientsTracked, foot: tr('实时统计', 'Real-time') },
             ] as const).map(stat => (
               <article key={stat.label} className="card portal-stat">
                 <p className="stat-label">{stat.label}</p>

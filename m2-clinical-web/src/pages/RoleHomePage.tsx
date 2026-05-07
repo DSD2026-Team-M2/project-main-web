@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import '../styles/role-entry.css'
 import { useI18n } from '../i18n/I18nContext'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
@@ -74,9 +74,6 @@ export function RoleHomePage() {
             <button type="button" className="btn role-entry-btn" onClick={() => setActiveRole(card)}>
               {card.action}
             </button>
-            <Link className="role-link role-link-inline" to={card.route}>
-              {t('enterNow')}
-            </Link>
           </article>
         ))}
       </section>

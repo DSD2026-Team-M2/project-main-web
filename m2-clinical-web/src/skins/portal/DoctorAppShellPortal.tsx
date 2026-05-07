@@ -25,6 +25,7 @@ export function DoctorAppShellPortal({
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
   const navigate = useNavigate()
+  const me = authStore.getUser()
 
   function logout() {
     authStore.clearToken()
@@ -78,6 +79,9 @@ export function DoctorAppShellPortal({
                 {t('logout')}
               </button>
             )}
+            <span className="muted small" style={{ fontWeight: 700 }}>
+              👨‍⚕️ {me?.name ?? 'Doctor'}
+            </span>
             <LanguageSwitcher />
           </div>
         </div>

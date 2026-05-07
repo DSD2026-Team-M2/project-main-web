@@ -33,6 +33,11 @@ const Limb3DPage = lazy(async () => {
 })
 
 function HomeRedirect() {
+  // Default landing should be the role entry (doctor/admin).
+  return <Navigate to="/roles" replace />
+}
+
+function DoctorHomeRedirect() {
   return <Navigate to="/doctor/patients" replace />
 }
 
@@ -88,14 +93,14 @@ export default function App() {
           <SkinProvider>
             <PatientProvider>
               <RouteThemeSync />
-              <SkinDevSwitcher />
+              {/* Skin switcher UI hidden per request */}
               <Routes>
                 <Route path="/" element={<HomeRedirect />} />
                 <Route path="/roles" element={<RoleHomePage />} />
                 <Route path="/auth/:role" element={<AuthGatewayPage />} />
                 <Route path="/admin" element={<AdminPortalPage />} />
                 {/* Doctor entry — now goes to patient list */}
-                <Route path="/doctor" element={<HomeRedirect />} />
+                <Route path="/doctor" element={<DoctorHomeRedirect />} />
                 <Route path="/doctor/patients" element={<PatientListPage />} />
                 {/* Patient-specific pages (with sidebar layout) */}
                 <Route path="/doctor/p/:patientId" element={<LayoutWithSync />}>

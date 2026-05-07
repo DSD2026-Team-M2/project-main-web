@@ -26,6 +26,7 @@ export function AppLayout({
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
   const navigate = useNavigate()
+  const me = authStore.getUser()
 
   function logout() {
     authStore.clearToken()
@@ -80,7 +81,7 @@ export function AppLayout({
           </div>
 
           {/* Right: patient name + back button (API) or back to roles (legacy) */}
-          <div className="patient-row top-right">
+          <div className="patient-row top-right" style={{ justifyContent: 'flex-end', gap: 10 }}>
             {isApiPatient ? (
               <>
                 <span className="patient-meta muted small" style={{ fontWeight: 600 }}>
@@ -96,6 +97,9 @@ export function AppLayout({
                 {t('logout')}
               </button>
             )}
+            <span className="muted small" style={{ fontWeight: 700 }}>
+              👨‍⚕️ {me?.name ?? 'Doctor'}
+            </span>
             <LanguageSwitcher />
           </div>
 

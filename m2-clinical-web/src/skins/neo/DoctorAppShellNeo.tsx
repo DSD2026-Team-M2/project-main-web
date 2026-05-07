@@ -26,6 +26,7 @@ export function DoctorAppShellNeo({
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
   const navigate = useNavigate()
+  const me = authStore.getUser()
 
   function logout() {
     authStore.clearToken()
@@ -48,7 +49,10 @@ export function DoctorAppShellNeo({
         <div className="neo-app-top-center">
           <ViewShareBar />
         </div>
-        <div className="neo-app-top-right">
+        <div className="neo-app-top-right" style={{ justifyContent: 'flex-end', gap: 10 }}>
+          <span className="muted small" style={{ fontWeight: 700 }}>
+            👨‍⚕️ {me?.name ?? 'Doctor'}
+          </span>
           {isApiPatient ? (
             <Link className="btn ghost" to="/doctor/patients">
               {t('backToPatients')}

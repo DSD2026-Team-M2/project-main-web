@@ -80,31 +80,78 @@ export function SessionDetailPage() {
 
   // ── chart ─────────────────────────────────────────────────────────────────
   const chartOption = useMemo(() => {
-    const allJoints = new Set<string>()
-    measurements.forEach((m) => m.joint_angles.forEach((j) => allJoints.add(j.angleID)))
-    const timestamps = measurements.map((m) => m.timestamp.slice(11, 19))
-    const series = [...allJoints].map((joint) => ({
-      type: 'line',
-      name: joint,
-      smooth: true,
-      data: measurements.map((m) => {
-        const ja = m.joint_angles.find((j) => j.angleID === joint)
-        return ja ? ja.angle : null
-      }),
-    }))
+    // Flatten all target angles across all measurements (session timeline).
+    type Pt = { ts: string; joint: string; angle: number }
+    const points: Pt[] = []
+    measurements.forEach((m: any) => {
+      const ta = m?.targetAngles
+      if (!Array.isArray(ta)) return
+      ta.forEach((j: any) => {
+        const ts = j?.timestamp
+        const joint = j?.angleID
+        const angle = Number(j?.angle)
+        if (typeof ts !== 'string') return
+        if (typeof joint !== 'string' || !joint) return
+        if (!Number.isFinite(angle)) return
+        points.push({ ts, joint, angle })
+      })
+    })
+
+    if (points.length === 0) {
+      return {
+        tooltip: { trigger: 'axis' },
+        legend: { data: [] as string[] },
+        xAxis: { type: 'category', data: [] as string[] },
+        yAxis: { type: 'value', name: 'Angle (°)' },
+        series: [] as any[],
+      }
+    }
+
+    // Sort by timestamp and build unique x-axis labels.
+    points.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime())
+    const xFull = Array.from(new Set(points.map((p) => p.ts)))
+    const xLabels = xFull.map((ts) => ts.slice(11, 19))
+
+    const joints = Array.from(new Set(points.map((p) => p.joint)))
+
+    // Build a timestamp->index map for fast fill.
+    const idx = new Map<string, number>()
+    xFull.forEach((ts, i) => idx.set(ts, i))
+
+    // If multiple samples land on same (joint,timestamp), average them.
+    const acc = new Map<string, { sum: number; n: number }>() // key: `${joint}@@${ts}`
+    points.forEach((p) => {
+      const k = `${p.joint}@@${p.ts}`
+      const cur = acc.get(k)
+      if (!cur) acc.set(k, { sum: p.angle, n: 1 })
+      else { cur.sum += p.angle; cur.n += 1 }
+    })
+
+    const series = joints.map((joint) => {
+      const data = new Array<number | null>(xFull.length).fill(null)
+      for (const [k, v] of acc.entries()) {
+        const [j, ts] = k.split('@@')
+        if (j !== joint) continue
+        const i = idx.get(ts)
+        if (i == null) continue
+        data[i] = parseFloat((v.sum / v.n).toFixed(2))
+      }
+      return { type: 'line', name: joint, smooth: true, data }
+    })
+
     return {
       tooltip: { trigger: 'axis' },
-      legend: { data: [...allJoints] },
-      xAxis: { type: 'category', data: timestamps, axisLabel: { fontSize: 11 } },
+      legend: { data: joints },
+      xAxis: { type: 'category', data: xLabels, axisLabel: { fontSize: 11 } },
       yAxis: { type: 'value', name: 'Angle (°)' },
+      grid: { top: 30, left: 50, right: 20, bottom: 80, containLabel: true },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', xAxisIndex: 0, height: 22, bottom: 22, filterMode: 'none' },
+      ],
       series,
     }
   }, [measurements])
-
-  const correctCount = measurements.filter((m) => m.is_correct).length
-  const accuracy = measurements.length
-    ? Math.round((correctCount / measurements.length) * 100)
-    : 0
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -129,30 +176,6 @@ export function SessionDetailPage() {
         <LoadingBlock label={t('sessionDetailLoading')} />
       ) : (
         <>
-          {/* ── Stats ── */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-              gap: '0.75rem',
-              marginBottom: '1rem',
-            }}
-          >
-            {[
-              { label: t('sessionMeasurements'), value: measurements.length,               color: 'var(--accent)' },
-              { label: t('sessionCorrect'),       value: correctCount,                      color: '#22c55e'       },
-              { label: t('sessionIncorrect'),     value: measurements.length - correctCount, color: '#ef4444'      },
-              { label: t('sessionAccuracy'),      value: `${accuracy}%`,                   color: 'var(--accent)' },
-            ].map((stat) => (
-              <div key={stat.label} className="card" style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
-                <div style={{ fontSize: '1.75rem', fontWeight: 700, color: stat.color }}>
-                  {stat.value}
-                </div>
-                <div className="muted small">{stat.label}</div>
-              </div>
-            ))}
-          </div>
-
           {/* ── Motion Data Chart ── */}
           <section className="card" style={{ marginBottom: '1rem' }}>
             <h2 className="card-title">{t('sessionChartTitle')}</h2>

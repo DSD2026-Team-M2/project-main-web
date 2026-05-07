@@ -25,6 +25,7 @@ export function DoctorAppShellRadiology({
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
   const navigate = useNavigate()
+  const me = authStore.getUser()
 
   function logout() {
     authStore.clearToken()
@@ -57,7 +58,7 @@ export function DoctorAppShellRadiology({
             <h1 className="radiology-title">{displayName}</h1>
             <p className="radiology-subtitle">{patientMeta}</p>
           </div>
-          <div className="radiology-header-tools">
+          <div className="radiology-header-tools" style={{ justifyContent: 'flex-end', gap: 10 }}>
             <ViewShareBar />
           {isApiPatient ? (
             <Link className="btn ghost" to="/doctor/patients">
@@ -68,6 +69,9 @@ export function DoctorAppShellRadiology({
                 {t('logout')}
               </button>
             )}
+            <span className="muted small" style={{ fontWeight: 700 }}>
+              👨‍⚕️ {me?.name ?? 'Doctor'}
+            </span>
             <LanguageSwitcher />
           </div>
         </div>

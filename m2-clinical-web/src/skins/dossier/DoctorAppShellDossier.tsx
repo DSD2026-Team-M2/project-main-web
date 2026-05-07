@@ -25,6 +25,7 @@ export function DoctorAppShellDossier({
   const { t } = useI18n()
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
   const navigate = useNavigate()
+  const me = authStore.getUser()
 
   function logout() {
     authStore.clearToken()
@@ -56,7 +57,7 @@ export function DoctorAppShellDossier({
           <strong>{recordLabel}</strong>
           <span className="muted small dossier-tab-meta">{metaLabel}</span>
         </div>
-        <div className="dossier-header-tools">
+        <div className="dossier-header-tools" style={{ justifyContent: 'flex-end', gap: 10 }}>
           <ViewShareBar />
           {isApiPatient ? (
             <Link className="btn ghost" to="/doctor/patients">
@@ -67,6 +68,9 @@ export function DoctorAppShellDossier({
               {t('logout')}
             </button>
           )}
+          <span className="muted small" style={{ fontWeight: 700 }}>
+            👨‍⚕️ {me?.name ?? 'Doctor'}
+          </span>
           <LanguageSwitcher />
         </div>
         <nav className="dossier-nav" aria-label={t('navMain')}>

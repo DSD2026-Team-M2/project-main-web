@@ -9,7 +9,7 @@ const LANG_LABELS: Record<Locale, string> = {
 }
 
 export function LanguageSwitcher() {
-  const { locale, setLocale, t } = useI18n()
+  const { locale, setLocale } = useI18n()
   const options: { value: Locale; label: string }[] = [
     { value: 'zh-CN', label: LANG_LABELS['zh-CN'] },
     { value: 'en',    label: LANG_LABELS['en']    },
@@ -17,7 +17,7 @@ export function LanguageSwitcher() {
   ]
   return (
     <label className="lang-switch small global-lang-switcher">
-      <span className="muted">{t('language')}</span>
+      <span className="muted">Language</span>
       <select
         className="patient-select"
         value={locale}

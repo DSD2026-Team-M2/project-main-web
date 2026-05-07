@@ -98,7 +98,7 @@
 :root[data-skin='neo'] .neo-app-top-right {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 0.5rem;
 }
 
