@@ -25,7 +25,6 @@ Sessions
 
 POST /sessions — { userId }
 GET /sessions/:id
-GET /sessions?userId=
 PATCH /sessions/:id/end
 DELETE /sessions/:id
 Measurements

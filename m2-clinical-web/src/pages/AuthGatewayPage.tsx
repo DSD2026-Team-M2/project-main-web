@@ -33,6 +33,12 @@ export function AuthGatewayPage() {
   const [busy, setBusy] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
+  // Re-upload license flow for rejected clinicians
+  const [reuploadOpen, setReuploadOpen] = useState(false)
+  const [reuploadUserId, setReuploadUserId] = useState<number | null>(null)
+  const [reuploadFile, setReuploadFile] = useState<File | null>(null)
+  const [reuploadPreview, setReuploadPreview] = useState<string>('')
+
   const safeRole: RoleKey = role === 'admin' ? 'admin' : 'doctor'
   const roleLabel = useMemo(
     () => (safeRole === 'doctor' ? t('roleDoctor') : t('roleAdmin')),
@@ -130,6 +136,16 @@ export function AuthGatewayPage() {
       if (res.ok) {
         const data = await res.json() as { token: string; user: AuthUser }
 
+        // Backend hotfix: if user is rejected but login still succeeds,
+        // block client-side login and force re-upload flow.
+        if (safeRole === 'doctor' && data.user?.status === 'rejected') {
+          authStore.clearToken()
+          setMsg(tr('你的证件未通过审核，请重新提交执照。', 'Your license was rejected. Please re-upload your license.'))
+          setReuploadUserId(typeof data.user.id === 'number' ? data.user.id : null)
+          setReuploadOpen(true)
+          return
+        }
+
         // Admin portal: reject anyone not in the whitelist, even with a valid token.
         if (safeRole === 'admin' && !ADMIN_EMAILS.has(data.user.email)) {
           setMsg(tr('该账号无管理员权限，请使用管理员邮箱登录。', 'This account does not have admin access.'))
@@ -140,8 +156,19 @@ export function AuthGatewayPage() {
         authStore.setUser(data.user)
         navigate(targetPath)
       } else if (res.status === 403) {
-        const body = await res.json().catch(() => ({})) as { error?: string }
-        setMsg(body.error ?? tr('账号正在等待审批，暂时无法登录。', 'Account pending admin approval.'))
+        const body = await res.json().catch(() => ({})) as { error?: string; status?: string; userId?: number; id?: number }
+        const status = body.status ?? ''
+        const errText = body.error ?? ''
+        const isRejected = status === 'rejected' || /rejected/i.test(errText) || errText.includes('未通过') || errText.includes('重新上传')
+
+        if (isRejected && safeRole === 'doctor') {
+          setMsg(tr('你的证件未通过审核，请重新提交执照。', 'Your license was rejected. Please re-upload your license.'))
+          const uid = body.userId ?? body.id ?? null
+          setReuploadUserId(typeof uid === 'number' ? uid : null)
+          setReuploadOpen(true)
+        } else {
+          setMsg(errText || tr('账号正在等待审批，暂时无法登录。', 'Account pending admin approval.'))
+        }
       } else {
         const body = await res.json().catch(() => ({})) as { error?: string }
         setMsg(body.error ?? tr(`登录失败 (${res.status})`, `Login failed (${res.status})`))
@@ -281,6 +308,70 @@ export function AuthGatewayPage() {
         </form>
 
         {msg ? <p className="small muted" style={{ marginTop: 10 }}>{msg}</p> : null}
+
+        {safeRole === 'doctor' && reuploadOpen && mode === 'login' ? (
+          <section className="card" style={{ marginTop: 12, border: '1px solid #f1c7c7' }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', color: '#7f1d1d' }}>
+              {tr('重新提交执照', 'Re-upload license')}
+            </h3>
+            <p className="muted small" style={{ marginTop: 6 }}>
+              {tr('请上传新的执照照片，提交后状态将变为 pending 等待管理员复审。', 'Upload a new license photo; status will reset to pending for admin review.')}
+            </p>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const f = e.target.files?.[0] ?? null
+                setReuploadFile(f)
+                if (f) {
+                  try { setReuploadPreview(await fileToDataUrl(f)) } catch { setReuploadPreview('') }
+                } else {
+                  setReuploadPreview('')
+                }
+              }}
+            />
+            {reuploadPreview ? (
+              <div style={{ marginTop: 8 }}>
+                <img src={reuploadPreview} alt={tr('执照预览', 'License preview')} style={{ width: 140, height: 140, objectFit: 'cover', borderRadius: 10, border: '1px solid #f1c7c7' }} />
+              </div>
+            ) : null}
+
+            <div className="role-actions" style={{ marginTop: 10, justifyContent: 'flex-start' }}>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={busy || !reuploadFile || !reuploadUserId}
+                onClick={async () => {
+                  if (!reuploadFile || !reuploadUserId) return
+                  setBusy(true)
+                  try {
+                    const fd = new FormData()
+                    fd.append('license', reuploadFile)
+                    const r = await fetch(`${BASE_URL}/users/${reuploadUserId}/license`, { method: 'PATCH', body: fd })
+                    const txt = await r.text().catch(() => '')
+                    if (!r.ok) throw new Error(txt || `HTTP ${r.status}`)
+                    setMsg(tr('已重新提交执照，等待管理员复审。', 'License re-submitted. Waiting for admin review.'))
+                    setReuploadOpen(false)
+                    setReuploadFile(null)
+                    setReuploadPreview('')
+                  } catch (err) {
+                    setMsg(err instanceof Error ? err.message : String(err))
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                {tr('提交新执照', 'Submit new license')}
+              </button>
+              {!reuploadUserId ? (
+                <span className="muted small" style={{ color: '#7f1d1d' }}>
+                  {tr('后端未返回 userId，无法自动提交；请联系管理员。', 'No userId returned; cannot submit automatically.')}
+                </span>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
       </section>
     </div>
   )

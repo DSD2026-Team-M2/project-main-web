@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { patientApiService } from '../services/patientApiService'
 import type { ApiPatient } from '../types/api'
 import { LoadingBlock } from '../components/common/LoadingBlock'

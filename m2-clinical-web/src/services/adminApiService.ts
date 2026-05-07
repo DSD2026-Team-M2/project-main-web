@@ -36,6 +36,16 @@ export const adminApiService = {
     return adminFetch<unknown>(`/users/${id}`)
   },
 
+  /** GET /users/:id/license — returns binary download (404 if none) */
+  async getUserLicense(id: number): Promise<Response> {
+    return fetch(`${BASE_URL}/users/${id}/license`, {
+      headers: {
+        Accept: '*/*',
+        ...authStore.getAuthHeaders(),
+      },
+    })
+  },
+
   /** GET /users filtered to clinicians with status=pending */
   async listPendingClinicians(): Promise<ApiPatient[]> {
     const users = await adminApiService.listAllUsers()
@@ -45,6 +55,17 @@ export const adminApiService = {
   /** PATCH /auth/approve/:userId */
   async approveClinician(userId: number): Promise<void> {
     return adminFetch<void>(`/auth/approve/${userId}`, { method: 'PATCH' })
+  },
+
+  /**
+   * PATCH /users/:id — reject clinician license (admin action).
+   * Backend said general user update endpoint accepts status updates incl. rejected/disabled.
+   */
+  async rejectClinician(userId: number): Promise<void> {
+    return adminFetch<void>(`/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'rejected' }),
+    })
   },
 }
 

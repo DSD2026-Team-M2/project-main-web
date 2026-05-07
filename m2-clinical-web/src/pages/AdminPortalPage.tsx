@@ -11,8 +11,6 @@ import { adminApiService } from '../services/adminApiService'
 import type { ApiPatient } from '../types/api'
 import { authStore } from '../services/authStore'
 
-const API_BASE_URL = 'http://113.44.220.94:3000'
-
 type AdminTab = 'registration' | 'accounts' | 'reports' | 'content'
 type AccountStatus = 'active' | 'disabled'
 
@@ -106,6 +104,7 @@ export function AdminPortalPage() {
     account: string
     images: string[]
   } | null>(null)
+  const [licenseObjectUrls, setLicenseObjectUrls] = useState<string[]>([])
   const [auditLogs, setAuditLogs] = useState<string[]>([
     tr('2026-05-05 08:40 [admin] 审批医生注册申请 app-003：通过', '2026-05-05 08:40 [admin] Approved doctor registration app-003'),
     tr('2026-05-04 17:22 [admin] 禁用账号 u-004', '2026-05-04 17:22 [admin] Disabled account u-004'),
@@ -155,33 +154,49 @@ export function AdminPortalPage() {
     }
   }
 
+  async function rejectApiClinician(user: ApiPatient) {
+    try {
+      await adminApiService.rejectClinician(user.id)
+      setApiPending(prev => prev.filter(u => u.id !== user.id))
+      pushAudit(tr(
+        `拒绝 API 医生注册申请 #${user.id}（${user.name}）`,
+        `Rejected API clinician registration #${user.id} (${user.name})`,
+      ))
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   async function viewApiLicense(user: ApiPatient) {
     try {
-      const full = await adminApiService.getUserById(user.id) as any
-      const raw =
-        full?.license_url ??
-        full?.licenseUrl ??
-        full?.license ??
-        full?.license_path ??
-        full?.licensePath
+      // clear old blob urls
+      licenseObjectUrls.forEach((u) => URL.revokeObjectURL(u))
+      setLicenseObjectUrls([])
 
-      const urls: string[] = Array.isArray(raw) ? raw : raw ? [String(raw)] : []
-      const images = urls
-        .map((u) => {
-          const s = String(u)
-          if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:')) return s
-          if (s.startsWith('/')) return `${API_BASE_URL}${s}`
-          return `${API_BASE_URL}/${s}`
-        })
-
-      setLicenseViewer({
-        name: user.name,
-        account: user.email,
-        images,
-      })
-      if (images.length === 0) {
-        window.alert(tr('该用户未返回执照字段（API 暂不支持查看）', 'No license field returned by API for this user.'))
+      const res = await adminApiService.getUserLicense(user.id)
+      if (res.status === 404) {
+        window.alert(tr('该医生未上传执照。', 'This doctor has no license on file.'))
+        return
       }
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        throw new Error(`[API] GET /users/${user.id}/license → ${res.status}: ${body}`)
+      }
+
+      const ct = res.headers.get('content-type') ?? ''
+      if (ct.includes('application/pdf')) {
+        window.alert(tr('执照是 PDF，当前前端暂不预览 PDF。', 'License is PDF; PDF preview is not supported yet.'))
+        return
+      }
+      if (!ct.startsWith('image/')) {
+        window.alert(tr(`执照文件类型不支持预览：${ct || 'unknown'}`, `Unsupported license content-type: ${ct || 'unknown'}`))
+        return
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      setLicenseObjectUrls([url])
+      setLicenseViewer({ name: user.name, account: user.email, images: [url] })
     } catch (err) {
       window.alert(err instanceof Error ? err.message : String(err))
     }
@@ -313,6 +328,13 @@ export function AdminPortalPage() {
                       >
                         {tr('通过', 'Approve')}
                       </button>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() => void rejectApiClinician(user)}
+                      >
+                        {tr('拒绝', 'Reject')}
+                      </button>
                     </div>
                   </article>
                 ))}
@@ -386,7 +408,15 @@ export function AdminPortalPage() {
               </div>
             )}
             <div className="role-actions" style={{ marginTop: 12 }}>
-              <button type="button" className="btn primary" onClick={() => setLicenseViewer(null)}>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  licenseObjectUrls.forEach((u) => URL.revokeObjectURL(u))
+                  setLicenseObjectUrls([])
+                  setLicenseViewer(null)
+                }}
+              >
                 {tr('关闭', 'Close')}
               </button>
             </div>
