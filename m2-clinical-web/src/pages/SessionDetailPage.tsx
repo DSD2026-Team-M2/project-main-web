@@ -19,6 +19,44 @@ const PRIORITY_CLASS: Record<string, string> = {
   low: 'pass',
 }
 
+/** Display API (UTC) timestamps in China standard time for chart axis & tooltips. */
+const CHART_DISPLAY_TZ = 'Asia/Shanghai'
+
+/** Axis: wall time in Asia/Shanghai, no date — HH:mm:ss */
+function formatChartAxisTime(ms: number, loc: string): string {
+  if (!Number.isFinite(ms)) return ''
+  return new Date(ms).toLocaleString(loc, {
+    timeZone: CHART_DISPLAY_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+}
+
+/** Tooltip: same zone with milliseconds (no calendar date). */
+function formatChartTooltipTime(ms: number, loc: string): string {
+  if (!Number.isFinite(ms)) return ''
+  try {
+    return new Intl.DateTimeFormat(loc, {
+      timeZone: CHART_DISPLAY_TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      fractionalSecondDigits: 3,
+      hour12: false,
+    }).format(new Date(ms))
+  } catch {
+    return new Date(ms).toLocaleString(loc, {
+      timeZone: CHART_DISPLAY_TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+  }
+}
+
 export function SessionDetailPage() {
   const { patientId = '1', sessionId = '1' } = useParams<{
     patientId: string
@@ -88,14 +126,15 @@ export function SessionDetailPage() {
     }
   }
 
-  // ── chart ─────────────────────────────────────────────────────────────────
+  // ── chart (time axis: each joint keeps its own sample times; display UTC+8) ─
   const chartOption = useMemo(() => {
-    // Flatten all target angles across all measurements (session timeline).
-    type Pt = { ts: string; joint: string; angle: number }
+    type Pt = { t: number; joint: string; angle: number }
     const points: Pt[] = []
     measurements.forEach((m) => {
       extractJointAnglesFromMeasurement(m).forEach((j) => {
-        points.push({ ts: j.timestamp, joint: j.angleID, angle: j.angle })
+        const t = new Date(j.timestamp).getTime()
+        if (!Number.isFinite(t)) return
+        points.push({ t, joint: j.angleID, angle: j.angle })
       })
     })
 
@@ -103,48 +142,85 @@ export function SessionDetailPage() {
       return {
         tooltip: { trigger: 'axis' },
         legend: { data: [] as string[] },
-        xAxis: { type: 'category', data: [] as string[] },
+        xAxis: { type: 'time' },
         yAxis: { type: 'value', name: 'Angle (°)' },
         series: [] as any[],
       }
     }
 
-    // Sort by timestamp and build unique x-axis labels.
-    points.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime())
-    const xFull = Array.from(new Set(points.map((p) => p.ts)))
-    const xLabels = xFull.map((ts) => ts.slice(11, 19))
-
     const joints = Array.from(new Set(points.map((p) => p.joint)))
-
-    // Build a timestamp->index map for fast fill.
-    const idx = new Map<string, number>()
-    xFull.forEach((ts, i) => idx.set(ts, i))
-
-    // If multiple samples land on same (joint,timestamp), average them.
-    const acc = new Map<string, { sum: number; n: number }>() // key: `${joint}@@${ts}`
+    const acc = new Map<string, Map<number, { sum: number; n: number }>>()
     points.forEach((p) => {
-      const k = `${p.joint}@@${p.ts}`
-      const cur = acc.get(k)
-      if (!cur) acc.set(k, { sum: p.angle, n: 1 })
-      else { cur.sum += p.angle; cur.n += 1 }
+      let byT = acc.get(p.joint)
+      if (!byT) {
+        byT = new Map()
+        acc.set(p.joint, byT)
+      }
+      const cur = byT.get(p.t)
+      if (!cur) byT.set(p.t, { sum: p.angle, n: 1 })
+      else {
+        cur.sum += p.angle
+        cur.n += 1
+      }
     })
 
     const series = joints.map((joint) => {
-      const data = new Array<number | null>(xFull.length).fill(null)
-      for (const [k, v] of acc.entries()) {
-        const [j, ts] = k.split('@@')
-        if (j !== joint) continue
-        const i = idx.get(ts)
-        if (i == null) continue
-        data[i] = parseFloat((v.sum / v.n).toFixed(2))
-      }
-      return { type: 'line', name: joint, smooth: true, data }
+      const byT = acc.get(joint)
+      if (!byT) return { type: 'line', name: joint, smooth: true, showSymbol: false, data: [] as [number, number][] }
+      const data: [number, number][] = [...byT.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([t, v]) => [t, parseFloat((v.sum / v.n).toFixed(2))])
+      return { type: 'line', name: joint, smooth: true, showSymbol: false, data }
     })
 
     return {
-      tooltip: { trigger: 'axis' },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross',
+          label: {
+            formatter: (p: { axisDimension?: string; value?: number }) =>
+              p.axisDimension === 'x' && p.value != null
+                ? formatChartAxisTime(Number(p.value), locale)
+                : String(p.value ?? ''),
+          },
+        },
+        formatter: (params: unknown) => {
+          const arr = params as {
+            axisValue: number
+            marker: string
+            seriesName: string
+            value: [number, number] | number | unknown
+            data: [number, number] | unknown
+          }[]
+          if (!Array.isArray(arr) || arr.length === 0) return ''
+          const head = formatChartTooltipTime(Number(arr[0].axisValue), locale)
+          const lines = arr
+            .map((p) => {
+              const raw = Array.isArray(p.value)
+                ? p.value
+                : Array.isArray(p.data)
+                  ? p.data
+                  : null
+              let y: number = NaN
+              if (raw && raw.length >= 2) y = Number(raw[1])
+              else if (typeof p.value === 'number') y = p.value
+              const yStr = Number.isFinite(y) ? String(y) : '—'
+              return `${p.marker}${p.seriesName}: ${yStr}°`
+            })
+            .join('<br/>')
+          return `<div style="font-weight:600;margin-bottom:4px">${head}</div>${lines}`
+        },
+      },
       legend: { data: joints },
-      xAxis: { type: 'category', data: xLabels, axisLabel: { fontSize: 11 } },
+      xAxis: {
+        type: 'time',
+        axisLabel: {
+          fontSize: 11,
+          hideOverlap: true,
+          formatter: (v: string | number) => formatChartAxisTime(Number(v), locale),
+        },
+      },
       yAxis: { type: 'value', name: 'Angle (°)' },
       grid: { top: 30, left: 50, right: 20, bottom: 80, containLabel: true },
       dataZoom: [
@@ -153,7 +229,7 @@ export function SessionDetailPage() {
       ],
       series,
     }
-  }, [measurements])
+  }, [measurements, locale])
 
   const startedAtTitle = useMemo(() => {
     const raw = sessionMeta?.started_at

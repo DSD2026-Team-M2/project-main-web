@@ -8,6 +8,17 @@ import { ErrorBanner } from '../components/common/ErrorBanner'
 import { useI18n } from '../i18n/I18nContext'
 import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
 
+function extractDataZoomPercent(e: unknown): { start: number; end: number } | null {
+  if (!e || typeof e !== 'object') return null
+  const o = e as Record<string, unknown>
+  if (Array.isArray(o.batch) && o.batch.length > 0) {
+    const b = o.batch[0] as Record<string, unknown>
+    if (typeof b.start === 'number' && typeof b.end === 'number') return { start: b.start, end: b.end }
+  }
+  if (typeof o.start === 'number' && typeof o.end === 'number') return { start: o.start, end: o.end }
+  return null
+}
+
 export function SessionsListPage() {
   const { patientId = '1' } = useParams<{ patientId: string }>()
   const navigate = useNavigate()
@@ -34,6 +45,8 @@ export function SessionsListPage() {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitMsg, setSubmitMsg] = useState<{ text: string; ok: boolean } | null>(null)
+
+  const [trendZoom, setTrendZoom] = useState({ start: 0, end: 100 })
 
   const load = useCallback(async () => {
     if (isNaN(uid)) { setSessions([]); setLoading(false); return }
@@ -69,6 +82,10 @@ export function SessionsListPage() {
 
   useEffect(() => { void load() }, [load])
 
+  useEffect(() => {
+    setTrendZoom({ start: 0, end: 100 })
+  }, [uid, startDate, endDate])
+
   // ── trend chart across sessions ───────────────────────────────────────────
   const trendOption = useMemo(() => {
     if (sessions.length === 0 || allMeasurements.length === 0) return null
@@ -84,8 +101,13 @@ export function SessionsListPage() {
     })
     if (jointIds.size === 0) return null
 
-    // X labels: "Session #N\nYYYY-MM-DD"
+    // X labels: "Session #N\nYYYY-MM-DD" — keep all categories for lines; sparse axis ticks when many sessions.
     const xLabels = sessions.map((s, i) => `Session #${i + 1}\n${s.started_at.slice(0, 10)}`)
+    const sessionCount = sessions.length
+    const spanPct = Math.max(0, Math.min(100, trendZoom.end) - Math.max(0, Math.min(100, trendZoom.start)))
+    const visibleSessions = Math.max(1, Math.round((spanPct / 100) * sessionCount))
+    const xAxisLabelInterval =
+      visibleSessions <= 10 ? 0 : Math.max(0, Math.ceil(visibleSessions / 8) - 1)
 
     const series = [...jointIds].map((joint) => ({
       type: 'line',
@@ -113,16 +135,42 @@ export function SessionsListPage() {
       xAxis: {
         type: 'category',
         data: xLabels,
-        axisLabel: { fontSize: 11, interval: 0, lineHeight: 16 },
+        axisLabel: {
+          fontSize: 11,
+          lineHeight: 16,
+          interval: xAxisLabelInterval,
+          hideOverlap: true,
+        },
       },
       yAxis: { type: 'value', name: 'Avg (°)', nameTextStyle: { fontSize: 11 } },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', xAxisIndex: 0, height: 22, bottom: 22, filterMode: 'none' },
+        {
+          type: 'inside',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          start: trendZoom.start,
+          end: trendZoom.end,
+        },
+        {
+          type: 'slider',
+          xAxisIndex: 0,
+          height: 22,
+          bottom: 22,
+          filterMode: 'none',
+          start: trendZoom.start,
+          end: trendZoom.end,
+        },
       ],
       series,
     }
-  }, [sessions, allMeasurements])
+  }, [sessions, allMeasurements, trendZoom])
+
+  const onTrendDataZoom = useCallback((e: unknown) => {
+    const r = extractDataZoomPercent(e)
+    if (r && Number.isFinite(r.start) && Number.isFinite(r.end)) {
+      setTrendZoom({ start: r.start, end: r.end })
+    }
+  }, [])
 
   // Sessions list should show newest on top, but keep chart order (old→new).
   const sessionsForList = useMemo(() => {
@@ -273,7 +321,11 @@ export function SessionsListPage() {
           {trendOption ? (
             <section className="card" style={{ marginBottom: '1rem' }}>
               <h2 className="card-title">{t('patientDashboardTrend')}</h2>
-              <ReactECharts option={trendOption} style={{ height: 380 }} />
+              <ReactECharts
+                option={trendOption}
+                style={{ height: 380 }}
+                onEvents={{ dataZoom: onTrendDataZoom }}
+              />
             </section>
           ) : null}
 
