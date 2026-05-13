@@ -4,12 +4,14 @@ import ReactECharts from 'echarts-for-react'
 import { patientApiService } from '../services/patientApiService'
 import type {
   ApiMeasurement,
+  ApiSession,
   ApiSessionRecommendation,
   ApiEngineRecommendation,
 } from '../types/api'
 import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { useI18n } from '../i18n/I18nContext'
+import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
 
 const PRIORITY_CLASS: Record<string, string> = {
   high: 'fail',
@@ -23,12 +25,13 @@ export function SessionDetailPage() {
     sessionId: string
   }>()
   const navigate = useNavigate()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const uid = Number(patientId)
   const sid = Number(sessionId)
 
   // ── measurements ──────────────────────────────────────────────────────────
   const [measurements, setMeasurements] = useState<ApiMeasurement[]>([])
+  const [sessionMeta, setSessionMeta] = useState<ApiSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
 
@@ -43,13 +46,20 @@ export function SessionDetailPage() {
     setLoading(true)
     setErr(null)
     try {
-      setMeasurements(await patientApiService.listMeasurements(sid))
+      const [ms, sessions] = await Promise.all([
+        patientApiService.listMeasurements(sid),
+        Number.isFinite(uid) && uid > 0
+          ? patientApiService.listSessions(uid)
+          : Promise.resolve([] as ApiSession[]),
+      ])
+      setMeasurements(ms)
+      setSessionMeta(sessions.find((s) => s.id === sid) ?? null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [sid, t])
+  }, [sid, uid, t])
 
   useEffect(() => { void load() }, [load])
 
@@ -83,17 +93,9 @@ export function SessionDetailPage() {
     // Flatten all target angles across all measurements (session timeline).
     type Pt = { ts: string; joint: string; angle: number }
     const points: Pt[] = []
-    measurements.forEach((m: any) => {
-      const ta = m?.targetAngles
-      if (!Array.isArray(ta)) return
-      ta.forEach((j: any) => {
-        const ts = j?.timestamp
-        const joint = j?.angleID
-        const angle = Number(j?.angle)
-        if (typeof ts !== 'string') return
-        if (typeof joint !== 'string' || !joint) return
-        if (!Number.isFinite(angle)) return
-        points.push({ ts, joint, angle })
+    measurements.forEach((m) => {
+      extractJointAnglesFromMeasurement(m).forEach((j) => {
+        points.push({ ts: j.timestamp, joint: j.angleID, angle: j.angle })
       })
     })
 
@@ -153,13 +155,24 @@ export function SessionDetailPage() {
     }
   }, [measurements])
 
+  const startedAtTitle = useMemo(() => {
+    const raw = sessionMeta?.started_at
+    if (!raw) return null
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleString(locale, { dateStyle: 'full', timeStyle: 'short' })
+  }, [sessionMeta, locale])
+
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="page doctor-workspace-page">
       <header className="page-header">
         <div>
-          <h1>Session #{sessionId}</h1>
-          <p className="muted">Patient #{patientId}</p>
+          <h1 style={{ marginBottom: '0.2rem' }}>
+            {startedAtTitle ?? (loading ? '…' : t('sessionDetailTimeUnknown'))}
+          </h1>
+          <p className="muted">{t('sessionDetailSessionLine', { id: sessionId })}</p>
+          <p className="muted">{t('sessionDetailPatientLine', { patientId })}</p>
         </div>
         <button
           type="button"

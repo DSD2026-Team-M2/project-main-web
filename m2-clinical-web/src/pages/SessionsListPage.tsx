@@ -6,11 +6,12 @@ import type { ApiMeasurement, ApiScheduleItem, ApiSession } from '../types/api'
 import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { useI18n } from '../i18n/I18nContext'
+import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
 
 export function SessionsListPage() {
   const { patientId = '1' } = useParams<{ patientId: string }>()
   const navigate = useNavigate()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const uid = Number(patientId)
 
   // ── data ──────────────────────────────────────────────────────────────────
@@ -76,10 +77,8 @@ export function SessionsListPage() {
     allMeasurements.forEach((ms) => {
       if (!Array.isArray(ms)) return
       ms.forEach((m) => {
-        const angles = (m as any)?.targetAngles
-        if (!Array.isArray(angles)) return
-        angles.forEach((j) => {
-          if (j?.angleID) jointIds.add(String(j.angleID))
+        extractJointAnglesFromMeasurement(m).forEach((j) => {
+          if (j.angleID) jointIds.add(j.angleID)
         })
       })
     })
@@ -96,11 +95,11 @@ export function SessionsListPage() {
       symbolSize: 6,
       data: allMeasurements.map((ms) => {
         if (!Array.isArray(ms)) return null
-        const angles = ms.flatMap((m: any) => {
-          const ta = m?.targetAngles
-          if (!Array.isArray(ta)) return []
-          return ta.filter((j: any) => j?.angleID === joint).map((j: any) => Number(j?.angle))
-        }).filter((n) => Number.isFinite(n))
+        const angles = ms.flatMap((m) =>
+          extractJointAnglesFromMeasurement(m)
+            .filter((j) => j.angleID === joint)
+            .map((j) => j.angle),
+        )
         return angles.length
           ? parseFloat((angles.reduce((a, b) => a + b, 0) / angles.length).toFixed(1))
           : null
@@ -109,14 +108,18 @@ export function SessionsListPage() {
 
     return {
       tooltip: { trigger: 'axis' },
-      legend: { data: [...jointIds], bottom: 0 },
-      grid: { top: 20, bottom: 60, left: 50, right: 20, containLabel: true },
+      legend: { data: [...jointIds], top: 4 },
+      grid: { top: 36, bottom: 80, left: 50, right: 20, containLabel: true },
       xAxis: {
         type: 'category',
         data: xLabels,
         axisLabel: { fontSize: 11, interval: 0, lineHeight: 16 },
       },
       yAxis: { type: 'value', name: 'Avg (°)', nameTextStyle: { fontSize: 11 } },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', xAxisIndex: 0, height: 22, bottom: 22, filterMode: 'none' },
+      ],
       series,
     }
   }, [sessions, allMeasurements])
@@ -134,6 +137,21 @@ export function SessionsListPage() {
     if (!end) return t('sessionsOngoing')
     const ms = new Date(end).getTime() - new Date(start).getTime()
     return `${Math.round(ms / 60_000)} min`
+  }
+
+  function formatSessionStartedAt(iso: string): string {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return d.toLocaleString(locale, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
   }
 
   function statusLabel(s: string) {
@@ -255,7 +273,7 @@ export function SessionsListPage() {
           {trendOption ? (
             <section className="card" style={{ marginBottom: '1rem' }}>
               <h2 className="card-title">{t('patientDashboardTrend')}</h2>
-              <ReactECharts option={trendOption} style={{ height: 320 }} />
+              <ReactECharts option={trendOption} style={{ height: 380 }} />
             </section>
           ) : null}
 
@@ -276,7 +294,7 @@ export function SessionsListPage() {
                     <div className="task-main">
                       <p className="task-title">Session #{seq}</p>
                       <p className="muted small">
-                        {new Date(s.started_at).toLocaleString()}
+                        {formatSessionStartedAt(s.started_at)}
                         {' · '}
                         {formatDuration(s.started_at, s.ended_at)}
                         {' · '}

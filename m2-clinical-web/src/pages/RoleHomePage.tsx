@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/role-entry.css'
 import { useI18n } from '../i18n/I18nContext'
@@ -18,6 +18,41 @@ type RoleCard = {
 
 export function RoleHomePage() {
   const { t } = useI18n()
+  const changelogEntries = useMemo(
+    () => [
+      {
+        version: '0.2.1',
+        date: t('changelog021Date'),
+        items: [
+          t('changelog021Item1'),
+          t('changelog021Item2'),
+          t('changelog021Item3'),
+          t('changelog021Item4'),
+        ],
+      },
+      {
+        version: '0.2.0',
+        date: t('changelog020Date'),
+        items: [
+          t('changelog020Item1'),
+          t('changelog020Item2'),
+          t('changelog020Item3'),
+          t('changelog020Item4'),
+        ],
+      },
+      {
+        version: '0.1.0',
+        date: t('changelog010Date'),
+        items: [
+          t('changelog010Item1'),
+          t('changelog010Item2'),
+          t('changelog010Item3'),
+          t('changelog010Item4'),
+        ],
+      },
+    ],
+    [t],
+  )
   const navigate = useNavigate()
   const [activeRole, setActiveRole] = useState<RoleCard | null>(null)
   const roleCards: RoleCard[] = [
@@ -76,6 +111,35 @@ export function RoleHomePage() {
             </button>
           </article>
         ))}
+      </section>
+
+      <section className="entry-changelog" aria-labelledby="entry-changelog-heading">
+        <h2 id="entry-changelog-heading" className="entry-changelog-title">
+          {t('roleChangelogTitle')}
+        </h2>
+        <div className="entry-changelog-body">
+          {changelogEntries.length === 0 ? (
+            <p className="entry-changelog-empty">{t('roleChangelogEmpty')}</p>
+          ) : (
+            <ul className="entry-changelog-list">
+              {changelogEntries.map((entry) => (
+                <li key={entry.version} className="entry-changelog-release">
+                  <div className="entry-changelog-release-head">
+                    <span className="entry-changelog-version">{entry.version}</span>
+                    {entry.date ? <span className="entry-changelog-date">{entry.date}</span> : null}
+                  </div>
+                  {entry.items.length > 0 ? (
+                    <ul className="entry-changelog-items">
+                      {entry.items.map((line, i) => (
+                        <li key={`${entry.version}-${i}`}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
       <footer className="entry-footer">

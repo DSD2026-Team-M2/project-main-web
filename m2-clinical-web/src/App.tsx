@@ -15,7 +15,6 @@ import { RoleHomePage } from './pages/RoleHomePage'
 import { I18nProvider, useI18n } from './i18n/I18nContext'
 import { ThemeProvider, useTheme } from './theme/ThemeContext'
 import { AuthGatewayPage } from './pages/AuthGatewayPage'
-import { SkinDevSwitcher } from './skin-engine/SkinDevSwitcher'
 import {
   DoctorAppShellSkin,
   DoctorClinicalSkinPage,

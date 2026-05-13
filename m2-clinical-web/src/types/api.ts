@@ -25,12 +25,20 @@ export type ApiJointAngle = {
   angle: number
 }
 
+/** Normalized shape used in the app after GET /measurements/:sessionId (backend may send snake_case). */
 export type ApiMeasurement = {
   id: number
   sessionId: number
+  /** Per-sample row time from the API when present */
+  timestamp?: string
+  /**
+   * Canonical joint samples. Wire payloads may use `joint_angles` or `targetAngles`;
+   * use `extractJointAnglesFromMeasurement` or `patientApiService.listMeasurements` so both work.
+   */
   targetAngles: ApiJointAngle[]
   errors: unknown[]
   sensorData: unknown[]
+  isCorrect?: boolean
 }
 
 export type ApiSessionRecommendation = {

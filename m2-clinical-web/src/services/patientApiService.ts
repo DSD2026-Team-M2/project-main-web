@@ -14,6 +14,7 @@ import type {
 } from '../types/api'
 import type { HistoryRecord, TrendSeries } from '../types/clinical'
 import { authStore } from './authStore'
+import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
 
 // ─── config ──────────────────────────────────────────────────────────────────
 const BASE_URL = 'http://113.44.220.94:3000'
@@ -37,6 +38,27 @@ async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   return text ? (JSON.parse(text) as T) : (null as T)
 }
 
+function normalizeApiMeasurement(raw: unknown): ApiMeasurement | null {
+  if (!raw || typeof raw !== 'object') return null
+  const m = raw as Record<string, unknown>
+  const id = Number(m.id)
+  if (!Number.isFinite(id)) return null
+  const sid = Number(m.sessionId ?? m.session_id)
+  const rowTs = typeof m.timestamp === 'string' ? m.timestamp : undefined
+  const sensorRaw = m.sensorData ?? m.sensor_data
+  const errorsRaw = m.errors
+  const isCorrect = typeof m.is_correct === 'boolean' ? m.is_correct : typeof m.isCorrect === 'boolean' ? m.isCorrect : undefined
+  return {
+    id,
+    sessionId: Number.isFinite(sid) ? sid : 0,
+    timestamp: rowTs,
+    targetAngles: extractJointAnglesFromMeasurement(m),
+    errors: Array.isArray(errorsRaw) ? errorsRaw : [],
+    sensorData: Array.isArray(sensorRaw) ? sensorRaw : [],
+    isCorrect,
+  }
+}
+
 // ─── service ─────────────────────────────────────────────────────────────────
 export const patientApiService = {
   // GET /patients
@@ -55,7 +77,9 @@ export const patientApiService = {
     if (range?.startDate) qs.set('startDate', range.startDate)
     if (range?.endDate) qs.set('endDate', range.endDate)
     const suffix = qs.toString() ? `?${qs.toString()}` : ''
-    return apiFetch<ApiMeasurement[]>(`/measurements/${sessionId}${suffix}`)
+    const raw = await apiFetch<unknown>(`/measurements/${sessionId}${suffix}`)
+    if (!Array.isArray(raw)) return []
+    return raw.map(normalizeApiMeasurement).filter((x): x is ApiMeasurement => x != null)
   },
 
   // GET /recommendations/session/:sessionId
@@ -95,7 +119,7 @@ export const patientApiService = {
     // Collect all joint IDs
     const jointIds = new Set<string>()
     allMeasurements.forEach((ms) =>
-      ms.forEach((m) => m.targetAngles.forEach((j) => jointIds.add(j.angleID))),
+      ms.forEach((m) => extractJointAnglesFromMeasurement(m).forEach((j) => jointIds.add(j.angleID))),
     )
 
     // Build series: one per joint, points indexed by session order
@@ -104,7 +128,7 @@ export const patientApiService = {
       points: sessions.map((session, idx) => {
         const ms = allMeasurements[idx]
         const angles = ms.flatMap((m) =>
-          m.targetAngles.filter((j) => j.angleID === joint).map((j) => j.angle),
+          extractJointAnglesFromMeasurement(m).filter((j) => j.angleID === joint).map((j) => j.angle),
         )
         const avg = angles.length ? angles.reduce((a, b) => a + b, 0) / angles.length : 0
         return {
@@ -132,7 +156,7 @@ export const patientApiService = {
       // Compute average for each joint across this session's measurements
       const jointMap = new Map<string, number[]>()
       ms.forEach((m) =>
-        m.targetAngles.forEach((j) => {
+        extractJointAnglesFromMeasurement(m).forEach((j) => {
           if (!jointMap.has(j.angleID)) jointMap.set(j.angleID, [])
           jointMap.get(j.angleID)!.push(j.angle)
         }),
