@@ -8,6 +8,8 @@ import { ErrorBanner } from '../components/common/ErrorBanner'
 import { useI18n } from '../i18n/I18nContext'
 import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
 
+const COLLECTOR_EXE_URL = `${import.meta.env.BASE_URL}downloads/DSD-Collector.exe`
+
 function extractDataZoomPercent(e: unknown): { start: number; end: number } | null {
   if (!e || typeof e !== 'object') return null
   const o = e as Record<string, unknown>
@@ -290,20 +292,29 @@ export function SessionsListPage() {
           <section className="card collapsible-card" style={{ marginBottom: '1rem' }}>
             <div className="collapsible-head">
               <h2 className="card-title">{t('patientDashboardSessions')}</h2>
-              {sessions.length > 0 ? (
-                <button
-                  type="button"
-                  className="btn ghost collapsible-toggle"
-                  aria-expanded={sessionsListOpen}
-                  aria-controls="sessions-list-panel"
-                  onClick={() => setSessionsListOpen((open) => !open)}
+              <div className="collapsible-actions">
+                <a
+                  href={COLLECTOR_EXE_URL}
+                  download="DSD-Collector.exe"
+                  className="btn ghost"
                 >
-                  <span>{sessionsListOpen ? t('sessionsCollapse') : t('sessionsExpand')}</span>
-                  <span className="collapsible-chevron" aria-hidden>
-                    {sessionsListOpen ? '▴' : '▾'}
-                  </span>
-                </button>
-              ) : null}
+                  {t('downloadCollectorTool')}
+                </a>
+                {sessions.length > 0 ? (
+                  <button
+                    type="button"
+                    className="btn ghost collapsible-toggle"
+                    aria-expanded={sessionsListOpen}
+                    aria-controls="sessions-list-panel"
+                    onClick={() => setSessionsListOpen((open) => !open)}
+                  >
+                    <span>{sessionsListOpen ? t('sessionsCollapse') : t('sessionsExpand')}</span>
+                    <span className="collapsible-chevron" aria-hidden>
+                      {sessionsListOpen ? '▴' : '▾'}
+                    </span>
+                  </button>
+                ) : null}
+              </div>
             </div>
             {!sessionsListOpen && sessions.length > 0 ? (
               <p className="muted small collapsible-summary">

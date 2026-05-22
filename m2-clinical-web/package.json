@@ -1,7 +1,7 @@
 {
   "name": "m2-clinical-web",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "homepage": "https://dsd2026-team-m2.github.io/project-main-web",
   "type": "module",
   "scripts": {
