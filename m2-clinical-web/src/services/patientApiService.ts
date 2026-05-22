@@ -38,6 +38,36 @@ async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   return text ? (JSON.parse(text) as T) : (null as T)
 }
 
+const SCHEDULE_STATUSES = ['pending', 'completed', 'skipped'] as const
+type ScheduleStatus = (typeof SCHEDULE_STATUSES)[number]
+
+function normalizeScheduleStatus(raw: unknown): ScheduleStatus | null {
+  if (typeof raw !== 'string') return null
+  const s = raw.trim().toLowerCase()
+  return (SCHEDULE_STATUSES as readonly string[]).includes(s) ? (s as ScheduleStatus) : null
+}
+
+function normalizeApiScheduleItem(raw: unknown): ApiScheduleItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = Number(o.id)
+  if (!Number.isFinite(id)) return null
+  const userId = Number(o.user_id ?? o.userId)
+  const status = normalizeScheduleStatus(o.status)
+  if (!status) return null
+  const createdAt = typeof o.created_at === 'string' ? o.created_at : undefined
+  return {
+    id,
+    user_id: Number.isFinite(userId) ? userId : 0,
+    exercise: String(o.exercise ?? ''),
+    date: String(o.date ?? ''),
+    duration: Number(o.duration) || 0,
+    notes: String(o.notes ?? ''),
+    status,
+    ...(createdAt ? { created_at: createdAt } : {}),
+  }
+}
+
 function normalizeApiMeasurement(raw: unknown): ApiMeasurement | null {
   if (!raw || typeof raw !== 'object') return null
   const m = raw as Record<string, unknown>
@@ -95,15 +125,22 @@ export const patientApiService = {
 
   // POST /schedule
   async createScheduleItem(input: CreateScheduleInput): Promise<ApiScheduleItem> {
-    return apiFetch<ApiScheduleItem>('/schedule', {
+    const raw = await apiFetch<unknown>('/schedule', {
       method: 'POST',
       body: JSON.stringify(input),
     })
+    const item = normalizeApiScheduleItem(raw)
+    if (!item) {
+      throw new Error('[API] POST /schedule returned invalid or missing status')
+    }
+    return item
   },
 
   // GET /schedule/:userId
   async listSchedule(userId: number): Promise<ApiScheduleItem[]> {
-    return apiFetch<ApiScheduleItem[]>(`/schedule/${userId}`)
+    const raw = await apiFetch<unknown>(`/schedule/${userId}`)
+    if (!Array.isArray(raw)) return []
+    return raw.map(normalizeApiScheduleItem).filter((x): x is ApiScheduleItem => x != null)
   },
 
   /**

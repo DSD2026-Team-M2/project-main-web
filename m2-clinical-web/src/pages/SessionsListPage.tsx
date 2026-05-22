@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
 import { patientApiService } from '../services/patientApiService'
-import type { ApiMeasurement, ApiScheduleItem, ApiSession } from '../types/api'
+import type { ApiMeasurement, ApiSession } from '../types/api'
 import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { useI18n } from '../i18n/I18nContext'
@@ -37,26 +37,15 @@ export function SessionsListPage() {
   const startPickerRef = useRef<HTMLInputElement | null>(null)
   const endPickerRef = useRef<HTMLInputElement | null>(null)
 
-  // ── prescription state ────────────────────────────────────────────────────
-  const [schedule, setSchedule] = useState<ApiScheduleItem[]>([])
-  const [exercise, setExercise] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [duration, setDuration] = useState('30')
-  const [notes, setNotes] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [submitMsg, setSubmitMsg] = useState<{ text: string; ok: boolean } | null>(null)
-
   const [trendZoom, setTrendZoom] = useState({ start: 0, end: 100 })
+  const [sessionsListOpen, setSessionsListOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (isNaN(uid)) { setSessions([]); setLoading(false); return }
     setLoading(true)
     setErr(null)
     try {
-      const [sess, sched] = await Promise.all([
-        patientApiService.listSessions(uid),
-        patientApiService.listSchedule(uid),
-      ])
+      const sess = await patientApiService.listSessions(uid)
       const filtered = sess.filter((s) => {
         const d = s.started_at.slice(0, 10)
         if (startDate && d < startDate) return false
@@ -67,7 +56,6 @@ export function SessionsListPage() {
         (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
       )
       setSessions(sorted)
-      setSchedule(sched)
       const ms = await Promise.all(
         sorted.map((s) => patientApiService.listMeasurements(s.id, { startDate, endDate })),
       )
@@ -85,6 +73,10 @@ export function SessionsListPage() {
   useEffect(() => {
     setTrendZoom({ start: 0, end: 100 })
   }, [uid, startDate, endDate])
+
+  useEffect(() => {
+    setSessionsListOpen(false)
+  }, [uid])
 
   // ── trend chart across sessions ───────────────────────────────────────────
   const trendOption = useMemo(() => {
@@ -202,41 +194,6 @@ export function SessionsListPage() {
     })
   }
 
-  function statusLabel(s: string) {
-    if (s === 'pending') return t('statusPending')
-    if (s === 'completed') return t('statusCompleted')
-    if (s === 'skipped') return t('statusSkipped')
-    return s
-  }
-
-  // ── prescription submit ───────────────────────────────────────────────────
-  async function submitSchedule(e: React.FormEvent) {
-    e.preventDefault()
-    if (!exercise.trim()) {
-      setSubmitMsg({ text: t('sessionPrescriptionRequired'), ok: false })
-      return
-    }
-    setSubmitting(true)
-    setSubmitMsg(null)
-    try {
-      const item = await patientApiService.createScheduleItem({
-        userId: uid,
-        exercise,
-        date,
-        duration: Number(duration) || 30,
-        notes,
-      })
-      setSchedule((prev) => [item, ...prev])
-      setExercise('')
-      setNotes('')
-      setSubmitMsg({ text: t('sessionPrescriptionAdded'), ok: true })
-    } catch (e) {
-      setSubmitMsg({ text: e instanceof Error ? e.message : t('loadFailed'), ok: false })
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="page doctor-workspace-page">
@@ -329,156 +286,67 @@ export function SessionsListPage() {
             </section>
           ) : null}
 
-          {/* ── Sessions List ── */}
-          <section className="card" style={{ marginBottom: '1rem' }}>
-            <h2 className="card-title">{t('patientDashboardSessions')}</h2>
-            {sessions.length === 0 ? (
-              <p className="muted">{t('sessionsEmpty')}</p>
-            ) : (
-              <div className="task-list">
-                {sessionsForList.map(({ s, seq }) => (
-                  <article
-                    key={s.id}
-                    className="task-row"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/doctor/p/${patientId}/session/${s.id}`)}
-                  >
-                    <div className="task-main">
-                      <p className="task-title">Session #{seq}</p>
-                      <p className="muted small">
-                        {formatSessionStartedAt(s.started_at)}
-                        {' · '}
-                        {formatDuration(s.started_at, s.ended_at)}
-                        {' · '}
-                        {s.measurement_count} {t('sessionMeasurements').toLowerCase()}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn primary"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/doctor/p/${patientId}/session/${s.id}`)
-                      }}
-                    >
-                      {t('sessionsView')}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* ── Prescription / Schedule ── */}
-          <section className="card">
-            <h2 className="card-title">{t('patientDashboardPrescription')}</h2>
-
-            <form
-              onSubmit={(e) => void submitSchedule(e)}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '0.75rem',
-                marginBottom: '1rem',
-              }}
-            >
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('sessionExercisePh')} *
-                </label>
-                <input
-                  className="patient-select"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  placeholder={t('sessionExercisePh')}
-                  value={exercise}
-                  onChange={(e) => setExercise(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('sessionDate')}
-                </label>
-                <input
-                  type="date"
-                  className="patient-select"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('sessionDuration')}
-                </label>
-                <input
-                  type="number"
-                  className="patient-select"
-                  style={{ width: '100%', boxSizing: 'border-box' }}
-                  value={duration}
-                  min="1"
-                  onChange={(e) => setDuration(e.target.value)}
-                />
-              </div>
-
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label className="muted small" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                  {t('sessionNotes')}
-                </label>
-                <textarea
-                  className="patient-select"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    minHeight: '64px',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                    fontSize: 'inherit',
-                  }}
-                  placeholder={t('sessionNotesPh')}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-
-              <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <button type="submit" className="btn primary" disabled={submitting}>
-                  {submitting ? t('sessionSaving') : t('sessionAddPrescription')}
-                </button>
-                {submitMsg ? (
-                  <span className="small" style={{ color: submitMsg.ok ? '#22c55e' : '#ef4444' }}>
-                    {submitMsg.text}
+          {/* ── Sessions List (collapsible) ── */}
+          <section className="card collapsible-card" style={{ marginBottom: '1rem' }}>
+            <div className="collapsible-head">
+              <h2 className="card-title">{t('patientDashboardSessions')}</h2>
+              {sessions.length > 0 ? (
+                <button
+                  type="button"
+                  className="btn ghost collapsible-toggle"
+                  aria-expanded={sessionsListOpen}
+                  aria-controls="sessions-list-panel"
+                  onClick={() => setSessionsListOpen((open) => !open)}
+                >
+                  <span>{sessionsListOpen ? t('sessionsCollapse') : t('sessionsExpand')}</span>
+                  <span className="collapsible-chevron" aria-hidden>
+                    {sessionsListOpen ? '▴' : '▾'}
                   </span>
-                ) : null}
-              </div>
-            </form>
-
-            {schedule.length > 0 ? (
-              <div className="task-list">
-                {schedule.map((item) => (
-                  <div key={item.id} className="task-row">
-                    <div className="task-main">
-                      <p className="task-title">{item.exercise}</p>
-                      <p className="muted small">
-                        {item.date} · {item.duration} min
-                        {item.notes ? ` · ${item.notes}` : ''}
-                      </p>
-                    </div>
-                    <span
-                      className={`check-state ${
-                        item.status === 'completed'
-                          ? 'pass'
-                          : item.status === 'skipped'
-                          ? 'fail'
-                          : 'idle'
-                      }`}
-                    >
-                      {statusLabel(item.status)}
-                    </span>
+                </button>
+              ) : null}
+            </div>
+            {!sessionsListOpen && sessions.length > 0 ? (
+              <p className="muted small collapsible-summary">
+                {t('sessionsCollapsedSummary', { count: String(sessions.length) })}
+              </p>
+            ) : null}
+            {sessionsListOpen || sessions.length === 0 ? (
+              <div id="sessions-list-panel" className="collapsible-body">
+                {sessions.length === 0 ? (
+                  <p className="muted">{t('sessionsEmpty')}</p>
+                ) : (
+                  <div className="task-list">
+                    {sessionsForList.map(({ s, seq }) => (
+                      <article
+                        key={s.id}
+                        className="task-row"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => navigate(`/doctor/p/${patientId}/session/${s.id}`)}
+                      >
+                        <div className="task-main">
+                          <p className="task-title">Session #{seq}</p>
+                          <p className="muted small">
+                            {formatSessionStartedAt(s.started_at)}
+                            {' · '}
+                            {formatDuration(s.started_at, s.ended_at)}
+                            {' · '}
+                            {s.measurement_count} {t('sessionMeasurements').toLowerCase()}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn primary"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/doctor/p/${patientId}/session/${s.id}`)
+                          }}
+                        >
+                          {t('sessionsView')}
+                        </button>
+                      </article>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             ) : null}
           </section>

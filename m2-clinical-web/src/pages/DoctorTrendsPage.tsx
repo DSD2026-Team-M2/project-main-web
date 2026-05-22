@@ -1,23 +1,18 @@
-import { TrendChart } from '../../components/charts/TrendChart'
-import { ErrorBanner } from '../../components/common/ErrorBanner'
-import { LoadingBlock } from '../../components/common/LoadingBlock'
-import { useDoctorTrendsViewModel } from '../../viewmodels/useDoctorTrendsViewModel'
+import { TrendChart } from '../components/charts/TrendChart'
+import { ErrorBanner } from '../components/common/ErrorBanner'
+import { LoadingBlock } from '../components/common/LoadingBlock'
+import { useDoctorTrendsViewModel } from '../viewmodels/useDoctorTrendsViewModel'
 
-export function DoctorTrendsPageNeo() {
+export function DoctorTrendsPage() {
   const vm = useDoctorTrendsViewModel()
 
   return (
-    <div className="neo-page neo-page-trends">
-      <header className="neo-header">
+    <div className="page doctor-workspace-page">
+      <header className="page-header">
         <div>
-          <p className="neo-kicker">Rehab Intelligence</p>
           <h1>{vm.t('navTrends')}</h1>
           <p className="muted">{vm.t('trendsDesc')}</p>
         </div>
-      </header>
-
-      <section className="neo-toolbar card">
-        <span className="small muted">{vm.t('timeRange')}</span>
         <div className="range-toggle" role="group" aria-label={vm.t('timeRange')}>
           {([['week', vm.t('week')], ['month', vm.t('month')], ['all', vm.t('all')]] as const).map(
             ([k, lab]) => (
@@ -32,14 +27,14 @@ export function DoctorTrendsPageNeo() {
             ),
           )}
         </div>
-      </section>
-
+      </header>
       {vm.err ? <ErrorBanner message={vm.err} onRetry={() => void vm.reload()} /> : null}
       {vm.loading ? (
         <LoadingBlock label={vm.t('loadingTrends')} />
       ) : (
-        <section className="card neo-chart-card">
-          <TrendChart seriesList={vm.series} events={vm.events} height={460} />
+        <section className="card">
+          <TrendChart seriesList={vm.series} events={vm.events} height={440} />
+          <p className="muted small chart-footnote">{vm.t('trendsFoot')}</p>
         </section>
       )}
     </div>

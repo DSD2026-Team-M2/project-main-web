@@ -569,6 +569,22 @@
   margin-bottom: 0.5rem;
 }
 
+.notes-rich-wrap {
+  position: relative;
+}
+
+.notes-rich-wrap.is-empty::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  left: 0.75rem;
+  top: 0.65rem;
+  right: 0.75rem;
+  color: #94a3b8;
+  pointer-events: none;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .notes-rich {
   width: 100%;
   min-height: 120px;
@@ -576,6 +592,12 @@
   border: 1px solid #cbd5e1;
   padding: 0.65rem 0.75rem;
   background: #fff;
+  outline: none;
+}
+
+.notes-rich:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
 }
 
 .notes-versions {

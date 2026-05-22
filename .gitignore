@@ -25,3 +25,4 @@ dist-ssr
 
 # Local-only scripts (do not commit)
 m2-clinical-web/scripts/*
+DSD2026-app-windows-main/*

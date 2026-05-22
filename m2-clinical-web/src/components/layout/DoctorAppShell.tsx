@@ -1,15 +1,15 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { usePatient } from '../../context/PatientContext'
-import { ClinicalNotes } from '../../components/common/ClinicalNotes'
-import { ErrorBanner } from '../../components/common/ErrorBanner'
-import { LoadingBlock } from '../../components/common/LoadingBlock'
-import { LanguageSwitcher } from '../../components/common/LanguageSwitcher'
-import { ViewShareBar } from '../../components/common/ViewShareBar'
+import { DoctorPatientDock } from '../doctor/DoctorPatientDock'
+import { ErrorBanner } from '../common/ErrorBanner'
+import { LoadingBlock } from '../common/LoadingBlock'
+import { LanguageSwitcher } from '../common/LanguageSwitcher'
+import { ViewShareBar } from '../common/ViewShareBar'
 import { useI18n } from '../../i18n/I18nContext'
 import { useApiPatientInfo } from '../../hooks/useApiPatientInfo'
 import { authStore } from '../../services/authStore'
 
-export function DoctorAppShellPortal({
+export function DoctorAppShell({
   onPatientChange,
 }: {
   onPatientChange: (id: string) => void
@@ -33,7 +33,7 @@ export function DoctorAppShellPortal({
   }
 
   const navItems = [
-    { to: 'sessions',  label: t('navSessions') },
+    { to: 'sessions', label: t('navSessions') },
     // clinical / trends / history temporarily hidden per request
   ] as const
 
@@ -46,7 +46,6 @@ export function DoctorAppShellPortal({
             {t('appTitle')}
           </div>
           <nav className="patient-nav" aria-label={t('navMain')}>
-            {/* Patient List link always first */}
             <NavLink
               className={({ isActive }) => `patient-nav-link${isActive ? ' active' : ''}`}
               to="/doctor/patients"
@@ -87,7 +86,6 @@ export function DoctorAppShellPortal({
         </div>
       </header>
 
-      {/* Patient strip: only show for legacy mock patients */}
       {!isApiPatient && (
         <div className="doctor-portal-patient-strip">
           <div className="patient-nav-inner doctor-portal-patient-inner">
@@ -128,7 +126,7 @@ export function DoctorAppShellPortal({
         </div>
       </main>
 
-      <ClinicalNotes />
+      <DoctorPatientDock />
     </div>
   )
 }

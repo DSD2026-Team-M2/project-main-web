@@ -73,6 +73,7 @@ export type ApiScheduleItem = {
   duration: number
   notes: string
   status: 'pending' | 'completed' | 'skipped'
+  created_at?: string
 }
 
 export type CreateScheduleInput = {

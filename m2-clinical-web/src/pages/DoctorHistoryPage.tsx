@@ -1,26 +1,26 @@
 import ReactECharts from 'echarts-for-react'
-import { ComparisonPanel } from '../../components/history/ComparisonPanel'
-import { HistoryMetricsPreview, HistoryTable } from '../../components/history/HistoryTable'
-import { ErrorBanner } from '../../components/common/ErrorBanner'
-import { LoadingBlock } from '../../components/common/LoadingBlock'
-import { useDoctorHistoryViewModel } from '../../viewmodels/useDoctorHistoryViewModel'
+import { ComparisonPanel } from '../components/history/ComparisonPanel'
+import { HistoryMetricsPreview, HistoryTable } from '../components/history/HistoryTable'
+import { ErrorBanner } from '../components/common/ErrorBanner'
+import { LoadingBlock } from '../components/common/LoadingBlock'
+import { useDoctorHistoryViewModel } from '../viewmodels/useDoctorHistoryViewModel'
 
-export function DoctorHistoryPageNeo() {
+export function DoctorHistoryPage() {
   const vm = useDoctorHistoryViewModel()
 
   return (
-    <div className="neo-page neo-page-history">
-      <header className="neo-header">
-        <p className="neo-kicker">Timeline Studio</p>
-        <h1>{vm.t('navHistory')}</h1>
-        <p className="muted">{vm.t('historyDesc')}</p>
+    <div className="page doctor-workspace-page">
+      <header className="page-header">
+        <div>
+          <h1>{vm.t('navHistory')}</h1>
+          <p className="muted">{vm.t('historyDesc')}</p>
+        </div>
       </header>
-
       {vm.err ? <ErrorBanner message={vm.err} onRetry={() => void vm.reload()} /> : null}
       {vm.loading ? (
         <LoadingBlock label={vm.t('loadingHistory')} />
       ) : (
-        <div className="neo-history-grid">
+        <>
           <section className="card">
             <HistoryTable rows={vm.rows} selectedIds={vm.selected} onToggle={vm.toggle} />
           </section>
@@ -53,7 +53,7 @@ export function DoctorHistoryPageNeo() {
               </ul>
             </section>
           ) : null}
-        </div>
+        </>
       )}
     </div>
   )
