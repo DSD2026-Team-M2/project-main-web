@@ -68,6 +68,19 @@
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.patient-nav-tools-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.feedback-modal {
+  width: min(95vw, 480px);
 }
 
 .patient-nav-link {

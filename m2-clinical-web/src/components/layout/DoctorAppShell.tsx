@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { usePatient } from '../../context/PatientContext'
 import { DoctorPatientDock } from '../doctor/DoctorPatientDock'
 import { ErrorBanner } from '../common/ErrorBanner'
 import { LoadingBlock } from '../common/LoadingBlock'
 import { LanguageSwitcher } from '../common/LanguageSwitcher'
-import { ViewShareBar } from '../common/ViewShareBar'
+import { FeedbackSubmitModal } from '../doctor/FeedbackSubmitModal'
+import { LogoutConfirmModal } from '../common/LogoutConfirmModal'
+import { AnnouncementTicker } from '../common/AnnouncementTicker'
 import { useI18n } from '../../i18n/I18nContext'
 import { useApiPatientInfo } from '../../hooks/useApiPatientInfo'
 import { authStore } from '../../services/authStore'
@@ -26,6 +29,8 @@ export function DoctorAppShell({
   const { isApiPatient, apiPatientName } = useApiPatientInfo(patientId)
   const navigate = useNavigate()
   const me = authStore.getUser()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [logoutOpen, setLogoutOpen] = useState(false)
 
   function logout() {
     authStore.clearToken()
@@ -63,28 +68,34 @@ export function DoctorAppShell({
             ))}
           </nav>
           <div className="patient-nav-tools">
-            <ViewShareBar />
-            {isApiPatient ? (
-              <>
-                <span className="muted small" style={{ fontWeight: 600 }}>
-                  👤 {apiPatientName}
-                </span>
-                <Link className="btn ghost role-link" to="/doctor/patients">
-                  {t('backToPatients')}
-                </Link>
-              </>
-            ) : (
-              <button type="button" className="btn ghost role-link" onClick={logout}>
-                {t('logout')}
-              </button>
-            )}
-            <span className="muted small" style={{ fontWeight: 700 }}>
-              👨‍⚕️ {me?.name ?? 'Doctor'}
+            <span className="muted small" style={{ fontWeight: isApiPatient ? 600 : 700 }}>
+              {isApiPatient ? (
+                <>👤 {apiPatientName}</>
+              ) : (
+                <>👨‍⚕️ {me?.name ?? 'Doctor'}</>
+              )}
             </span>
+            {isApiPatient ? (
+              <Link className="btn ghost role-link" to="/doctor/patients">
+                {t('backToPatients')}
+              </Link>
+            ) : null}
+            <button type="button" className="btn ghost role-link" onClick={() => setLogoutOpen(true)}>
+              {t('logout')}
+            </button>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => setFeedbackOpen(true)}
+            >
+              {t('submitFeedback')}
+            </button>
             <LanguageSwitcher />
           </div>
         </div>
       </header>
+
+      <AnnouncementTicker />
 
       {!isApiPatient && (
         <div className="doctor-portal-patient-strip">
@@ -127,6 +138,12 @@ export function DoctorAppShell({
       </main>
 
       <DoctorPatientDock />
+      <FeedbackSubmitModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <LogoutConfirmModal
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={logout}
+      />
     </div>
   )
 }

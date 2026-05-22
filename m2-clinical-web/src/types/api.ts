@@ -1,13 +1,23 @@
 /** API data types matching the backend at dsd2026-teamv2-production.up.railway.app */
 
+export type ApiUserRole = 'patient' | 'clinician' | 'admin'
+export type ApiUserStatus = 'active' | 'pending' | 'rejected' | 'disabled'
+
 export type ApiPatient = {
   id: number
   name: string
   email: string
-  role: 'patient' | 'clinician' | 'admin'
+  role: ApiUserRole
   age: number | null
-  status: 'active' | 'pending' | 'disabled'
+  status: ApiUserStatus
   created_at: string
+}
+
+export type UpdateUserInput = {
+  name?: string
+  age?: number | null
+  role?: ApiUserRole
+  status?: ApiUserStatus
 }
 
 export type ApiSession = {
@@ -82,4 +92,70 @@ export type CreateScheduleInput = {
   date: string
   duration: number
   notes: string
+}
+
+export type FeedbackStatus = 'pending' | 'reviewed' | 'resolved'
+
+export type ApiFeedback = {
+  id: number
+  user_id: number
+  content: string
+  status: FeedbackStatus
+  response: string | null
+  created_at: string
+  updated_at: string | null
+  user_name?: string
+  user_email?: string
+}
+
+export type CreateFeedbackInput = {
+  userId: number
+  content: string
+}
+
+export type UpdateFeedbackInput = {
+  status?: FeedbackStatus
+  response?: string
+}
+
+export type AnnouncementStatus = 'draft' | 'published'
+
+export type ApiAnnouncement = {
+  id: number
+  title: string
+  content: string
+  status: AnnouncementStatus
+  created_by: number
+  created_at: string
+  updated_at: string | null
+  created_by_name?: string
+}
+
+export type CreateAnnouncementInput = {
+  title: string
+  content: string
+  createdBy: number
+}
+
+export type UpdateAnnouncementInput = {
+  title?: string
+  content?: string
+  status?: AnnouncementStatus
+}
+
+export type AuditLogQuery = {
+  userId?: number
+  action?: string
+  targetType?: string
+}
+
+export type ApiAuditLog = {
+  id: number
+  user_id: number | null
+  action: string
+  target_type: string
+  target_id: number | null
+  details: string | null
+  created_at: string
+  user_name: string | null
 }

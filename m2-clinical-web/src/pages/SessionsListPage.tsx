@@ -296,7 +296,7 @@ export function SessionsListPage() {
                 <a
                   href={COLLECTOR_EXE_URL}
                   download="DSD-Collector.exe"
-                  className="btn ghost"
+                  className="btn primary"
                 >
                   {t('downloadCollectorTool')}
                 </a>

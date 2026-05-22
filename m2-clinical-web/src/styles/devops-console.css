@@ -27,21 +27,41 @@
   box-shadow: 0 14px 30px rgba(4, 12, 27, 0.48);
 }
 
+/* Headings on dark glass cards */
 .devops-console .card-title,
-.devops-console h2,
-.devops-console h3,
-.devops-console .task-title,
-.devops-console .stat-value {
+.devops-console .card > h2.card-title,
+.devops-console .devops-tabbar .card-title {
   color: #edf4ff;
 }
 
+/* KPI tiles sit on dark .card panels — keep metrics light */
+.devops-console .portal-stat .stat-label {
+  color: var(--dev-muted);
+}
+
+.devops-console .portal-stat .stat-value {
+  color: #edf4ff;
+}
+
+.devops-console .portal-stat .stat-foot {
+  color: var(--dev-muted);
+}
+
+/* List row titles sit on white/light rows — use dark text */
+.devops-console .task-row .task-title,
+.devops-console .task-list .task-title,
+.devops-console .audit-log-list .task-title {
+  color: #0f172a;
+  font-weight: 700;
+}
+
 .applicant-name {
-  color: #0f2a4e;
+  color: #0f172a;
   font-weight: 800;
 }
 
 .devops-console .applicant-name {
-  color: #0f2a4e;
+  color: #0f172a;
 }
 
 .devops-console .muted,

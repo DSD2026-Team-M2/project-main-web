@@ -4,7 +4,8 @@
  */
 
 const TOKEN_KEY = 'm2:auth:token'
-const USER_KEY  = 'm2:auth:user'
+const USER_KEY = 'm2:auth:user'
+const ANNOUNCEMENT_DISMISS_PREFIX = 'm2:announcements:dismissed:'
 
 export type AuthUser = {
   id: number
@@ -24,9 +25,32 @@ export const authStore = {
   },
 
   clearToken(): void {
+    const user = authStore.getUser()
     try {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
+      if (user?.id) authStore.clearAnnouncementBarDismissed(user.id)
+    } catch { /* ignore */ }
+  },
+
+  /** Doctor announcement bar hidden for this browser tab session until logout. */
+  isAnnouncementBarDismissed(userId: number): boolean {
+    try {
+      return sessionStorage.getItem(`${ANNOUNCEMENT_DISMISS_PREFIX}${userId}`) === '1'
+    } catch {
+      return false
+    }
+  },
+
+  dismissAnnouncementBar(userId: number): void {
+    try {
+      sessionStorage.setItem(`${ANNOUNCEMENT_DISMISS_PREFIX}${userId}`, '1')
+    } catch { /* quota */ }
+  },
+
+  clearAnnouncementBarDismissed(userId: number): void {
+    try {
+      sessionStorage.removeItem(`${ANNOUNCEMENT_DISMISS_PREFIX}${userId}`)
     } catch { /* ignore */ }
   },
 

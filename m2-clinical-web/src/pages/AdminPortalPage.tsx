@@ -1,65 +1,42 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/devops-console.css'
 import { useI18n } from '../i18n/I18nContext'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
+import { LogoutConfirmModal } from '../components/common/LogoutConfirmModal'
 import { adminApiService } from '../services/adminApiService'
-import type { ApiPatient, ApiSession } from '../types/api'
+import { feedbackApiService } from '../services/feedbackApiService'
+import { announcementsApiService } from '../services/announcementsApiService'
+import { auditLogsApiService } from '../services/auditLogsApiService'
+import { AnnouncementFormModal } from '../components/admin/AnnouncementFormModal'
+import { UserEditModal } from '../components/admin/UserEditModal'
+import {
+  auditLogActor,
+  auditLogTarget,
+  formatAuditLogDetails,
+} from '../utils/formatAuditLog'
+import type {
+  AnnouncementStatus,
+  ApiAnnouncement,
+  ApiAuditLog,
+  ApiFeedback,
+  ApiPatient,
+  ApiSession,
+  ApiUserRole,
+  ApiUserStatus,
+  FeedbackStatus,
+} from '../types/api'
 import { authStore } from '../services/authStore'
 
-type AdminTab = 'registration' | 'accounts' | 'reports' | 'content'
-type AccountStatus = 'active' | 'disabled'
-
-
-type UserAccount = {
-  id: string
-  name: string
-  role: 'doctor' | 'admin'
-  email: string
-  status: AccountStatus
-  joinedAt: string
-}
-
-type FeedbackItem = {
-  id: string
-  from: string
-  subject: string
-  content: string
-  at: string
-  resolved: boolean
-}
-
-type ContentItem = {
-  id: string
-  title: string
-  type: 'announcement' | 'article' | 'notification'
-  status: 'draft' | 'published'
-  updatedAt: string
-}
-
-const initialAccounts: UserAccount[] = [
-  { id: 'u-001', name: '张伟', role: 'doctor', email: 'zhangwei@hospital.cn', status: 'active', joinedAt: '2026-04-28' },
-  { id: 'u-002', name: '李娟', role: 'doctor', email: 'lijuan@rehab.cn', status: 'active', joinedAt: '2026-04-30' },
-  { id: 'u-003', name: 'Admin', role: 'admin', email: 'admin@m2.cn', status: 'active', joinedAt: '2026-01-01' },
-  { id: 'u-004', name: '旧账号', role: 'doctor', email: 'old@hospital.cn', status: 'disabled', joinedAt: '2025-11-10' },
-]
-
-const initialFeedback: FeedbackItem[] = [
-  { id: 'fb-001', from: '张伟医生', subject: '趋势图加载慢', content: '在月度视图下图表加载需要 5 秒以上，建议优化。', at: '2026-05-03 09:12', resolved: false },
-  { id: 'fb-002', from: '李娟医生', subject: '3D 视图无法旋转', content: '在 Safari 浏览器下 3D 视图拖拽旋转无响应。', at: '2026-05-02 14:38', resolved: false },
-  { id: 'fb-003', from: '王磊医生', subject: '历史对比功能建议', content: '希望可以跨患者比较相同指标。', at: '2026-04-30 17:05', resolved: true },
-]
-
-const initialContent: ContentItem[] = [
-  { id: 'ct-001', title: '系统维护公告（5月10日）', type: 'announcement', status: 'draft', updatedAt: '2026-05-05' },
-  { id: 'ct-002', title: 'ACL 康复指南 v2 更新说明', type: 'article', status: 'published', updatedAt: '2026-05-01' },
-  { id: 'ct-003', title: '新功能上线通知', type: 'notification', status: 'published', updatedAt: '2026-04-28' },
-]
+type AdminTab = 'registration' | 'accounts' | 'reports' | 'feedback' | 'announcements'
+type FeedbackFilter = 'all' | FeedbackStatus
+type AnnouncementFilter = 'all' | AnnouncementStatus
 
 export function AdminPortalPage() {
-  const { t, locale } = useI18n()
-  const tr = (zh: string, en: string) => locale === 'zh-CN' ? zh : en
+  const { t } = useI18n()
   const navigate = useNavigate()
+
+  const [logoutOpen, setLogoutOpen] = useState(false)
 
   function logout() {
     authStore.clearToken()
@@ -75,9 +52,21 @@ export function AdminPortalPage() {
     patientsTracked: 0,
     activeSessions: 0,
   })
-  const [accounts, setAccounts] = useState(initialAccounts)
-  const [feedback, setFeedback] = useState(initialFeedback)
-  const [content, setContent] = useState(initialContent)
+  const [apiUsers, setApiUsers] = useState<ApiPatient[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersErr, setUsersErr] = useState('')
+  const [editingUser, setEditingUser] = useState<ApiPatient | null>(null)
+  const [userEditOpen, setUserEditOpen] = useState(false)
+  const [feedbackList, setFeedbackList] = useState<ApiFeedback[]>([])
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [feedbackErr, setFeedbackErr] = useState('')
+  const [feedbackFilter, setFeedbackFilter] = useState<FeedbackFilter>('all')
+  const [announcementList, setAnnouncementList] = useState<ApiAnnouncement[]>([])
+  const [announcementLoading, setAnnouncementLoading] = useState(false)
+  const [announcementErr, setAnnouncementErr] = useState('')
+  const [announcementFilter, setAnnouncementFilter] = useState<AnnouncementFilter>('all')
+  const [announcementFormOpen, setAnnouncementFormOpen] = useState(false)
+  const [editingAnnouncement, setEditingAnnouncement] = useState<ApiAnnouncement | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [licenseViewer, setLicenseViewer] = useState<{
     name: string
@@ -85,11 +74,100 @@ export function AdminPortalPage() {
     images: string[]
   } | null>(null)
   const [licenseObjectUrls, setLicenseObjectUrls] = useState<string[]>([])
-  const [auditLogs, setAuditLogs] = useState<string[]>([
-    tr('2026-05-05 08:40 [admin] 审批医生注册申请 app-003：通过', '2026-05-05 08:40 [admin] Approved doctor registration app-003'),
-    tr('2026-05-04 17:22 [admin] 禁用账号 u-004', '2026-05-04 17:22 [admin] Disabled account u-004'),
-    tr('2026-05-03 11:10 [admin] 发布内容 ct-002', '2026-05-03 11:10 [admin] Published content ct-002'),
-  ])
+  const [apiAuditLogs, setApiAuditLogs] = useState<ApiAuditLog[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditErr, setAuditErr] = useState('')
+
+  const loadFeedback = useCallback(async () => {
+    setFeedbackLoading(true)
+    setFeedbackErr('')
+    try {
+      const list =
+        feedbackFilter === 'all'
+          ? await feedbackApiService.listFeedback()
+          : await feedbackApiService.listFeedback(feedbackFilter)
+      const sorted = [...list].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      setFeedbackList(sorted)
+    } catch (err: unknown) {
+      setFeedbackErr(err instanceof Error ? err.message : t('adminFeedbackLoadErr'))
+    } finally {
+      setFeedbackLoading(false)
+    }
+  }, [feedbackFilter, t])
+
+  useEffect(() => {
+    void loadFeedback()
+  }, [loadFeedback])
+
+  const loadAnnouncements = useCallback(async () => {
+    setAnnouncementLoading(true)
+    setAnnouncementErr('')
+    try {
+      const list =
+        announcementFilter === 'all'
+          ? await announcementsApiService.listAnnouncements()
+          : await announcementsApiService.listAnnouncements(announcementFilter)
+      setAnnouncementList(
+        [...list].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        ),
+      )
+    } catch (err: unknown) {
+      setAnnouncementErr(err instanceof Error ? err.message : t('adminAnnouncementLoadErr'))
+    } finally {
+      setAnnouncementLoading(false)
+    }
+  }, [announcementFilter, t])
+
+  useEffect(() => {
+    if (activeTab === 'announcements') void loadAnnouncements()
+  }, [activeTab, loadAnnouncements])
+
+  const loadAuditLogs = useCallback(async () => {
+    setAuditLoading(true)
+    setAuditErr('')
+    try {
+      setApiAuditLogs(await auditLogsApiService.listAuditLogs())
+    } catch (err: unknown) {
+      setAuditErr(err instanceof Error ? err.message : t('adminAuditLoadErr'))
+    } finally {
+      setAuditLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => {
+    if (activeTab === 'reports') void loadAuditLogs()
+  }, [activeTab, loadAuditLogs])
+
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true)
+    setUsersErr('')
+    try {
+      setApiUsers(await adminApiService.listAllUsers())
+    } catch (err: unknown) {
+      setUsersErr(err instanceof Error ? err.message : t('adminUsersLoadErr'))
+    } finally {
+      setUsersLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => {
+    if (activeTab === 'accounts') void loadUsers()
+  }, [activeTab, loadUsers])
+
+  function exportAuditReport() {
+    const blob = new Blob([JSON.stringify(apiAuditLogs, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   // Load API-side pending clinicians on first render
   useEffect(() => {
@@ -115,20 +193,12 @@ export function AdminPortalPage() {
       .finally(() => setApiPendingLoading(false))
   }, [])
 
-  function pushAudit(entry: string) {
-    const now = new Date()
-    const ts = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    setAuditLogs(prev => [`${ts} [admin] ${entry}`, ...prev.slice(0, 19)])
-  }
-
   async function approveApiClinician(user: ApiPatient) {
     try {
       await adminApiService.approveClinician(user.id)
       setApiPending(prev => prev.filter(u => u.id !== user.id))
-      pushAudit(tr(
-        `通过 API 医生注册申请 #${user.id}（${user.name}）`,
-        `Approved API clinician registration #${user.id} (${user.name})`,
-      ))
+      void loadUsers()
+      void loadAuditLogs()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : String(err))
     }
@@ -138,10 +208,8 @@ export function AdminPortalPage() {
     try {
       await adminApiService.rejectClinician(user.id)
       setApiPending(prev => prev.filter(u => u.id !== user.id))
-      pushAudit(tr(
-        `拒绝 API 医生注册申请 #${user.id}（${user.name}）`,
-        `Rejected API clinician registration #${user.id} (${user.name})`,
-      ))
+      void loadUsers()
+      void loadAuditLogs()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : String(err))
     }
@@ -155,7 +223,7 @@ export function AdminPortalPage() {
 
       const res = await adminApiService.getUserLicense(user.id)
       if (res.status === 404) {
-        window.alert(tr('该医生未上传执照。', 'This doctor has no license on file.'))
+        window.alert(t('adminLicenseNoFile'))
         return
       }
       if (!res.ok) {
@@ -165,11 +233,11 @@ export function AdminPortalPage() {
 
       const ct = res.headers.get('content-type') ?? ''
       if (ct.includes('application/pdf')) {
-        window.alert(tr('执照是 PDF，当前前端暂不预览 PDF。', 'License is PDF; PDF preview is not supported yet.'))
+        window.alert(t('adminLicensePdf'))
         return
       }
       if (!ct.startsWith('image/')) {
-        window.alert(tr(`执照文件类型不支持预览：${ct || 'unknown'}`, `Unsupported license content-type: ${ct || 'unknown'}`))
+        window.alert(t('adminLicenseUnsupported', { type: ct || 'unknown' }))
         return
       }
 
@@ -182,70 +250,111 @@ export function AdminPortalPage() {
     }
   }
 
-  function toggleAccount(id: string) {
-    setAccounts(prev => prev.map(a => {
-      if (a.id !== id) return a
-      const next = a.status === 'active' ? 'disabled' : 'active'
-      pushAudit(tr(`账号 ${id} 状态更改为 ${next}`, `Account ${id} status changed to ${next}`))
-      return { ...a, status: next }
-    }))
+  function userRoleLabel(role: ApiUserRole): string {
+    if (role === 'patient') return t('adminRolePatient')
+    if (role === 'clinician') return t('adminRoleDoctor')
+    return t('adminRoleAdminLabel')
   }
 
-  function resolveFeedback(id: string) {
-    setFeedback(prev => prev.map(f => f.id === id ? { ...f, resolved: true } : f))
-    pushAudit(tr(`反馈 ${id} 已标记为已处理`, `Feedback ${id} marked as resolved`))
+  function userStatusLabel(status: ApiUserStatus): string {
+    if (status === 'active') return t('adminStatusActive')
+    if (status === 'pending') return t('adminStatusPending')
+    if (status === 'rejected') return t('adminStatusRejected')
+    return t('adminStatusDisabled')
   }
 
-  function togglePublish(id: string) {
-    setContent(prev => prev.map(c => {
-      if (c.id !== id) return c
-      const next = c.status === 'published' ? 'draft' : 'published'
-      pushAudit(tr(`内容 ${id}「${c.title}」状态变更为 ${next}`, `Content ${id} "${c.title}" status changed to ${next}`))
-      return { ...c, status: next }
-    }))
+  function userStatusClass(status: ApiUserStatus): string {
+    if (status === 'active') return 'pass'
+    if (status === 'pending') return 'idle'
+    return 'fail'
   }
 
-  function sendNotification(_id: string, title: string) {
-    pushAudit(tr(`手动推送通知「${title}」至所有医生`, `Manually pushed notification "${title}" to all doctors`))
-    window.alert(tr(`已向所有医生推送：${title}`, `Notification sent to all doctors: ${title}`))
+  function feedbackStatusLabel(status: FeedbackStatus): string {
+    if (status === 'pending') return t('adminFeedbackStatusPending')
+    if (status === 'reviewed') return t('adminFeedbackStatusReviewed')
+    return t('adminFeedbackStatusResolved')
   }
 
-  const filteredAccounts = accounts.filter(a =>
-    !searchQuery || a.name.includes(searchQuery) || a.email.includes(searchQuery) || a.role.includes(searchQuery)
-  )
+  function announcementStatusLabel(status: AnnouncementStatus): string {
+    return status === 'published'
+      ? t('adminAnnouncementStatusPublished')
+      : t('adminAnnouncementStatusDraft')
+  }
+
+  async function toggleAnnouncementStatus(row: ApiAnnouncement) {
+    const next: AnnouncementStatus = row.status === 'published' ? 'draft' : 'published'
+    try {
+      await announcementsApiService.updateAnnouncement(row.id, { status: next })
+      await loadAnnouncements()
+      void loadAuditLogs()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function deleteAnnouncement(row: ApiAnnouncement) {
+    if (!window.confirm(t('adminAnnouncementDeleteConfirm'))) return
+    try {
+      await announcementsApiService.deleteAnnouncement(row.id)
+      await loadAnnouncements()
+      void loadAuditLogs()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  async function updateFeedbackStatus(id: number, status: FeedbackStatus) {
+    try {
+      await feedbackApiService.updateFeedback(id, { status })
+      await loadFeedback()
+      void loadAuditLogs()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const filteredUsers = apiUsers.filter((u) => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.trim().toLowerCase()
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.role.includes(q) ||
+      userRoleLabel(u.role).toLowerCase().includes(q) ||
+      userStatusLabel(u.status).toLowerCase().includes(q)
+    )
+  })
 
   const pendingCount = apiPending.length
-  const unresolvedCount = feedback.filter(f => !f.resolved).length
+  const pendingFeedbackCount = feedbackList.filter((f) => f.status === 'pending').length
 
   const tabs: Array<{ key: AdminTab; label: string; badge?: number }> = [
-    { key: 'registration', label: tr('审核注册', 'Registration Review'), badge: pendingCount },
-    { key: 'accounts', label: tr('账号与权限', 'Accounts & Roles') },
-    { key: 'reports', label: tr('报告与审计', 'Reports & Audit') },
-    { key: 'content', label: tr('反馈与内容', 'Feedback & Content'), badge: unresolvedCount },
+    { key: 'registration', label: t('adminTabRegistration'), badge: pendingCount },
+    { key: 'accounts', label: t('adminTabAccounts') },
+    { key: 'reports', label: t('adminTabReports') },
+    { key: 'feedback', label: t('adminTabFeedback'), badge: pendingFeedbackCount },
+    { key: 'announcements', label: t('adminTabAnnouncements') },
   ]
 
   return (
     <div className="role-page portal-page developer-portal devops-console">
       <header className="portal-hero dev-hero devops-hero">
         <div className="hero-main">
-          <p className="hero-kicker">{tr('系统管理控制台', 'System Admin Console')}</p>
-          <h1>{tr('管理员工作台', 'Admin Dashboard')}</h1>
-          <p className="hero-desc">{tr(
-            '覆盖医生资质审核、账号权限管理、健康数据报告与内容运营全流程。',
-            'Full-cycle admin hub: doctor registration review, account management, health data reports, and content operations.',
-          )}</p>
+          <p className="hero-kicker">{t('adminHeroKicker')}</p>
+          <h1>{t('adminHeroTitle')}</h1>
+          <p className="hero-desc">{t('adminHeroDesc')}</p>
           <div className="hero-chips">
-            <span className="hero-chip">{tr(`待审申请 ${pendingCount}`, `${pendingCount} pending`)}</span>
-            <span className="hero-chip">{tr(`活跃医生 ${stats.activeDoctors}`, `${stats.activeDoctors} doctors`)}</span>
-            <span className="hero-chip">{tr(`未处理反馈 ${unresolvedCount}`, `${unresolvedCount} unresolved`)}</span>
+            <span className="hero-chip">{t('adminChipPending', { count: pendingCount })}</span>
+            <span className="hero-chip">{t('adminChipDoctors', { count: stats.activeDoctors })}</span>
+            <span className="hero-chip">{t('adminFeedbackPendingChip')} {pendingFeedbackCount}</span>
           </div>
         </div>
         <div className="hero-side">
-          <p className="muted small">{tr('跟踪患者', 'Patients tracked')}</p>
+          <p className="muted small">{t('adminPatientsTracked')}</p>
           <p className="hero-id">{stats.patientsTracked}</p>
-          <p className="muted small">{tr('在线会话', 'Active sessions')}: {stats.activeSessions}</p>
+          <p className="muted small">{t('adminActiveSessions')}: {stats.activeSessions}</p>
           <div className="role-actions" style={{ marginTop: '0.6rem' }}>
-            <button type="button" className="btn ghost role-link" onClick={logout}>{t('logout')}</button>
+            <button type="button" className="btn ghost role-link" onClick={() => setLogoutOpen(true)}>{t('logout')}</button>
             <LanguageSwitcher />
           </div>
         </div>
@@ -271,26 +380,26 @@ export function AdminPortalPage() {
       {/* ── Registration Review ── */}
       {activeTab === 'registration' ? (
         <section className="card">
-          <h2 className="card-title">{tr('医生注册申请审核', 'Doctor Registration Applications')}</h2>
-          <p className="muted small">{tr('审阅执照与资质。', 'Review license and credentials.')}</p>
+          <h2 className="card-title">{t('adminRegTitle')}</h2>
+          <p className="muted small">{t('adminRegDesc')}</p>
           {/* ── API-side pending clinicians ── */}
           <div style={{ marginTop: '1rem' }}>
             <p className="small muted" style={{ marginBottom: '0.5rem', fontWeight: 600 }}>
-              {tr('待审批注册', 'Pending registrations')}
+              {t('adminPendingRegistrations')}
             </p>
             {apiPendingLoading ? (
-              <p className="muted small">{tr('加载中…', 'Loading…')}</p>
+              <p className="muted small">{t('loading')}</p>
             ) : apiPendingErr ? (
               <p className="muted small" style={{ color: '#c53030' }}>{apiPendingErr}</p>
             ) : apiPending.length === 0 ? (
-              <p className="muted small">{tr('暂无待审批的 API 注册申请。', 'No pending API registrations.')}</p>
+              <p className="muted small">{t('adminNoPendingApi')}</p>
             ) : (
               <div className="task-list">
                 {apiPending.map(user => (
                   <article key={user.id} className="task-row precheck-row">
                     <div className="task-main">
                       <p className="task-title applicant-name">{user.name}</p>
-                      <p className="muted small">{user.email} · ID #{user.id} · {tr('注册于', 'Joined')} {user.created_at.slice(0, 10)}</p>
+                      <p className="muted small">{user.email} · ID #{user.id} · {t('adminJoined')} {user.created_at.slice(0, 10)}</p>
                     </div>
                     <div className="role-actions">
                       <button
@@ -298,21 +407,21 @@ export function AdminPortalPage() {
                         className="btn ghost"
                         onClick={() => void viewApiLicense(user)}
                       >
-                        {tr('查看执照', 'View license')}
+                        {t('adminViewLicense')}
                       </button>
                       <button
                         type="button"
                         className="btn primary"
                         onClick={() => void approveApiClinician(user)}
                       >
-                        {tr('通过', 'Approve')}
+                        {t('adminApprove')}
                       </button>
                       <button
                         type="button"
                         className="btn ghost"
                         onClick={() => void rejectApiClinician(user)}
                       >
-                        {tr('拒绝', 'Reject')}
+                        {t('adminReject')}
                       </button>
                     </div>
                   </article>
@@ -327,20 +436,20 @@ export function AdminPortalPage() {
         <div className="entry-modal-mask" role="dialog" aria-modal="true">
           <div className="entry-modal" style={{ width: 'min(95vw, 860px)' }}>
             <h3 style={{ margin: 0, color: '#0f2a4e' }}>
-              {tr('医生执照', 'Doctor license')}
+              {t('adminLicenseTitle')}
             </h3>
             <p className="muted small" style={{ marginTop: 6 }}>
               {licenseViewer.name} · {licenseViewer.account}
             </p>
             {licenseViewer.images.length === 0 ? (
-              <p className="muted">{tr('未上传执照图片。', 'No license images uploaded.')}</p>
+              <p className="muted">{t('adminNoLicenseImages')}</p>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
                 {licenseViewer.images.map((src, idx) => (
                   <a key={`${idx}-${src.slice(0, 18)}`} href={src} target="_blank" rel="noreferrer">
                     <img
                       src={src}
-                      alt={tr('执照图片', 'License image')}
+                      alt={t('adminLicenseImageAlt')}
                       style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 12, border: '1px solid #d2def0' }}
                     />
                   </a>
@@ -357,7 +466,7 @@ export function AdminPortalPage() {
                   setLicenseViewer(null)
                 }}
               >
-                {tr('关闭', 'Close')}
+                {t('close')}
               </button>
             </div>
           </div>
@@ -367,44 +476,67 @@ export function AdminPortalPage() {
       {/* ── Accounts & Roles ── */}
       {activeTab === 'accounts' ? (
         <section className="card">
-          <h2 className="card-title">{tr('账号与权限管理', 'Account & Role Management')}</h2>
-          <div className="role-actions" style={{ marginBottom: '0.8rem' }}>
+          <h2 className="card-title">{t('adminAccountsTitle')}</h2>
+          <div className="role-actions" style={{ marginBottom: '0.8rem', flexWrap: 'wrap' }}>
             <input
               className="patient-select"
-              style={{ flex: 1, maxWidth: 320 }}
-              placeholder={tr('搜索姓名 / 邮箱 / 角色…', 'Search name / email / role…')}
+              style={{ flex: 1, minWidth: 200, maxWidth: 420 }}
+              placeholder={t('adminSearchPlaceholder')}
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => void loadUsers()}
+              disabled={usersLoading}
+            >
+              {t('refresh')}
+            </button>
           </div>
-          <div className="task-list">
-            {filteredAccounts.map(acc => (
-              <article key={acc.id} className="task-row">
-                <div className="task-main">
-                  <p className="task-title">
-                    {acc.name}
-                    <span className="muted small" style={{ marginLeft: '0.5rem' }}>
-                      [{acc.role === 'doctor' ? tr('医生', 'Doctor') : tr('管理员', 'Admin')}]
+          {usersLoading ? (
+            <p className="muted small">{t('loading')}</p>
+          ) : usersErr ? (
+            <p className="muted small" style={{ color: '#c53030' }}>{usersErr}</p>
+          ) : filteredUsers.length === 0 ? (
+            <p className="muted small">{t('adminUsersEmpty')}</p>
+          ) : (
+            <div className="task-list">
+              {filteredUsers.map((u) => (
+                <article key={u.id} className="task-row">
+                  <div className="task-main">
+                    <p className="task-title">
+                      {u.name}
+                      <span className="muted small" style={{ marginLeft: '0.5rem' }}>
+                        [{userRoleLabel(u.role)}]
+                      </span>
+                    </p>
+                    <p className="muted small">
+                      {u.email} · ID #{u.id}
+                      {u.age != null ? ` · ${t('adminUserAgeLabel')} ${u.age}` : ''}
+                      {' · '}
+                      {t('adminJoined')} {u.created_at.slice(0, 10)}
+                    </p>
+                  </div>
+                  <div className="role-actions" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                    <span className={`check-state ${userStatusClass(u.status)}`}>
+                      {userStatusLabel(u.status)}
                     </span>
-                  </p>
-                  <p className="muted small">{acc.email} · {tr('加入', 'Joined')} {acc.joinedAt}</p>
-                </div>
-                <div className="role-actions">
-                  <span className={`check-state ${acc.status === 'active' ? 'pass' : 'fail'}`}>
-                    {acc.status === 'active' ? tr('正常', 'Active') : tr('已禁用', 'Disabled')}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    disabled={acc.role === 'admin'}
-                    onClick={() => toggleAccount(acc.id)}
-                  >
-                    {acc.status === 'active' ? tr('禁用', 'Disable') : tr('启用', 'Enable')}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => {
+                        setEditingUser(u)
+                        setUserEditOpen(true)
+                      }}
+                    >
+                      {t('adminEditUser')}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
 
@@ -413,9 +545,9 @@ export function AdminPortalPage() {
         <>
           <section className="portal-kpi-grid premium-grid">
             {([
-              { label: tr('活跃医生数', 'Active Doctors'), value: stats.activeDoctors, foot: tr('实时统计', 'Real-time') },
-              { label: tr('在线会话数', 'Active Sessions'), value: stats.activeSessions, foot: tr('实时统计', 'Real-time') },
-              { label: tr('跟踪患者数', 'Patients Tracked'), value: stats.patientsTracked, foot: tr('实时统计', 'Real-time') },
+              { label: t('adminStatActiveDoctors'), value: stats.activeDoctors, foot: t('adminStatRealtime') },
+              { label: t('adminStatActiveSessions'), value: stats.activeSessions, foot: t('adminStatRealtime') },
+              { label: t('adminStatPatientsTracked'), value: stats.patientsTracked, foot: t('adminStatRealtime') },
             ] as const).map(stat => (
               <article key={stat.label} className="card portal-stat">
                 <p className="stat-label">{stat.label}</p>
@@ -426,89 +558,283 @@ export function AdminPortalPage() {
           </section>
 
           <section className="card">
-            <h2 className="card-title">{tr('操作审计日志', 'Admin Action Audit Log')}</h2>
-            <p className="muted small" style={{ marginBottom: '0.6rem' }}>{tr('记录所有管理员操作，支持合规核查与追溯。', 'All admin actions are logged here for compliance and traceability.')}</p>
-            <div className="audit-list">
-              {auditLogs.map((log, i) => <p key={i}>{log}</p>)}
-            </div>
-            <div className="role-actions" style={{ marginTop: '0.6rem' }}>
-              <button type="button" className="btn ghost" onClick={() => pushAudit(tr('导出审计报告', 'Exported audit report'))}>
-                {tr('导出审计报告', 'Export Audit Report')}
+            <h2 className="card-title">{t('adminAuditTitle')}</h2>
+            <p className="muted small" style={{ marginBottom: '0.6rem' }}>
+              {t('adminAuditDesc')}
+            </p>
+            <div className="role-actions" style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => void loadAuditLogs()}
+                disabled={auditLoading}
+              >
+                {t('refresh')}
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={exportAuditReport}
+                disabled={apiAuditLogs.length === 0}
+              >
+                {t('adminExportAudit')}
               </button>
             </div>
+            {auditLoading ? (
+              <p className="muted small">{t('loading')}</p>
+            ) : auditErr ? (
+              <p className="muted small" style={{ color: '#c53030' }}>{auditErr}</p>
+            ) : apiAuditLogs.length === 0 ? (
+              <p className="muted small">{t('adminAuditEmpty')}</p>
+            ) : (
+              <div className="task-list audit-log-list">
+                {apiAuditLogs.map((log) => {
+                  const detailText = formatAuditLogDetails(log.details)
+                  return (
+                    <article key={log.id} className="task-row">
+                      <div className="task-main" style={{ flex: 1 }}>
+                        <p className="task-title" style={{ margin: 0, fontSize: '0.92rem' }}>
+                          {log.action}
+                        </p>
+                        <p className="muted small">
+                          #{log.id}
+                          {' · '}
+                          {new Date(log.created_at).toLocaleString()}
+                          {' · '}
+                          {auditLogActor(log)}
+                          {' · '}
+                          {auditLogTarget(log)}
+                        </p>
+                        {detailText ? (
+                          <p className="small muted" style={{ marginTop: '0.3rem' }}>
+                            {detailText}
+                          </p>
+                        ) : null}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
           </section>
         </>
       ) : null}
 
-      {/* ── Feedback & Content ── */}
-      {activeTab === 'content' ? (
-        <div className="portal-two-col premium-grid">
-          <section className="card">
-            <h2 className="card-title">{tr('用户反馈处理', 'User Feedback')}</h2>
-            <div className="task-list">
-              {feedback.map(fb => (
-                <article key={fb.id} className={`task-row ${fb.resolved ? '' : 'precheck-row'}`}>
-                  <div className="task-main">
-                    <p className="task-title">{fb.subject}</p>
-                    <p className="muted small">{fb.from} · {fb.at}</p>
-                    <p className="small" style={{ marginTop: '0.2rem' }}>{fb.content}</p>
-                  </div>
-                  <div className="role-actions">
-                    {fb.resolved
-                      ? <span className="check-state pass">{tr('已处理', 'Resolved')}</span>
-                      : <button type="button" className="btn primary" onClick={() => resolveFeedback(fb.id)}>{tr('标记已处理', 'Mark resolved')}</button>}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="card">
-            <h2 className="card-title">{tr('内容与通知管理', 'Content & Notifications')}</h2>
-            <div className="task-list">
-              {content.map(ct => (
-                <article key={ct.id} className="task-row">
-                  <div className="task-main">
-                    <p className="task-title">{ct.title}</p>
-                    <p className="muted small">
-                      {ct.type === 'announcement' ? tr('公告', 'Announcement')
-                        : ct.type === 'article' ? tr('文章', 'Article')
-                        : tr('通知', 'Notification')}
-                      {' · '}{tr('更新', 'Updated')} {ct.updatedAt}
-                    </p>
-                  </div>
-                  <div className="role-actions">
-                    <span className={`check-state ${ct.status === 'published' ? 'pass' : 'idle'}`}>
-                      {ct.status === 'published' ? tr('已发布', 'Published') : tr('草稿', 'Draft')}
-                    </span>
-                    <button type="button" className="btn ghost" onClick={() => togglePublish(ct.id)}>
-                      {ct.status === 'published' ? tr('撤回', 'Unpublish') : tr('发布', 'Publish')}
-                    </button>
-                    {ct.type === 'notification' && ct.status === 'published'
-                      ? <button type="button" className="btn primary" onClick={() => sendNotification(ct.id, ct.title)}>{tr('推送', 'Push')}</button>
-                      : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="role-actions" style={{ marginTop: '0.8rem' }}>
-              <button type="button" className="btn ghost" onClick={() => pushAudit(tr('新建内容草稿', 'Created new content draft'))}>
-                {tr('+ 新建内容', '+ New Content')}
+      {/* ── User Feedback (UC-M2-ADMIN-06) ── */}
+      {activeTab === 'feedback' ? (
+        <section className="card">
+          <h2 className="card-title">{t('adminFeedbackTitle')}</h2>
+          <div className="role-actions" style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            {(['all', 'pending', 'reviewed', 'resolved'] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={`btn ${feedbackFilter === key ? 'primary' : 'ghost'}`}
+                onClick={() => setFeedbackFilter(key)}
+              >
+                {key === 'all'
+                  ? t('adminFeedbackFilterAll')
+                  : key === 'pending'
+                    ? t('adminFeedbackFilterPending')
+                    : key === 'reviewed'
+                      ? t('adminFeedbackFilterReviewed')
+                      : t('adminFeedbackFilterResolved')}
               </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {/* Persistent audit log footer (visible on all tabs except reports which shows it inline) */}
-      {activeTab !== 'reports' ? (
-        <section className="card" style={{ marginTop: '0.8rem' }}>
-          <h2 className="card-title" style={{ fontSize: '0.95rem' }}>{tr('操作审计日志', 'Audit Log')}</h2>
-          <div className="audit-list" style={{ maxHeight: 120, overflowY: 'auto' }}>
-            {auditLogs.slice(0, 5).map((log, i) => <p key={i}>{log}</p>)}
+            ))}
+            <button type="button" className="btn ghost" onClick={() => void loadFeedback()} disabled={feedbackLoading}>
+              {t('refresh')}
+            </button>
           </div>
+          {feedbackLoading ? (
+            <p className="muted small">{t('loading')}</p>
+          ) : feedbackErr ? (
+            <p className="muted small" style={{ color: '#c53030' }}>{feedbackErr}</p>
+          ) : feedbackList.length === 0 ? (
+            <p className="muted small">{t('adminFeedbackEmpty')}</p>
+          ) : (
+            <div className="task-list">
+              {feedbackList.map((fb) => (
+                <article
+                  key={fb.id}
+                  className={`task-row feedback-row ${fb.status === 'pending' ? 'precheck-row' : ''}`}
+                >
+                  <div className="task-main" style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <p className="task-title" style={{ margin: 0 }}>#{fb.id}</p>
+                      <span className={`check-state ${fb.status === 'resolved' ? 'pass' : fb.status === 'reviewed' ? 'idle' : 'fail'}`}>
+                        {feedbackStatusLabel(fb.status)}
+                      </span>
+                    </div>
+                    <p className="muted small">
+                      {t('adminFeedbackFrom')}: {fb.user_name ?? `#${fb.user_id}`}
+                      {fb.user_email ? ` · ${fb.user_email}` : ''}
+                      {' · '}
+                      {new Date(fb.created_at).toLocaleString()}
+                    </p>
+                    <p className="small" style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap' }}>{fb.content}</p>
+                  </div>
+                  {fb.status !== 'resolved' ? (
+                    <div className="role-actions" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                      {fb.status === 'pending' ? (
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          onClick={() => void updateFeedbackStatus(fb.id, 'reviewed')}
+                        >
+                          {t('adminFeedbackMarkReviewed')}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn primary"
+                        onClick={() => void updateFeedbackStatus(fb.id, 'resolved')}
+                      >
+                        {t('adminFeedbackMarkResolved')}
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
+
+      {activeTab === 'announcements' ? (
+        <section className="card">
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+            <h2 className="card-title" style={{ margin: 0 }}>{t('adminAnnouncementsTitle')}</h2>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => {
+                setEditingAnnouncement(null)
+                setAnnouncementFormOpen(true)
+              }}
+            >
+              {t('adminAnnouncementAdd')}
+            </button>
+          </div>
+          <div className="role-actions" style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            {(['all', 'draft', 'published'] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={`btn ${announcementFilter === key ? 'primary' : 'ghost'}`}
+                onClick={() => setAnnouncementFilter(key)}
+              >
+                {key === 'all'
+                  ? t('adminAnnouncementFilterAll')
+                  : key === 'draft'
+                    ? t('adminAnnouncementFilterDraft')
+                    : t('adminAnnouncementFilterPublished')}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => void loadAnnouncements()}
+              disabled={announcementLoading}
+            >
+              {t('refresh')}
+            </button>
+          </div>
+          {announcementLoading ? (
+            <p className="muted small">{t('loading')}</p>
+          ) : announcementErr ? (
+            <p className="muted small" style={{ color: '#c53030' }}>{announcementErr}</p>
+          ) : announcementList.length === 0 ? (
+            <p className="muted small">{t('adminAnnouncementEmpty')}</p>
+          ) : (
+            <div className="task-list">
+              {announcementList.map((ann) => (
+                <article
+                  key={ann.id}
+                  className={`task-row ${ann.status === 'draft' ? 'precheck-row' : ''}`}
+                >
+                  <div className="task-main" style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <p className="task-title" style={{ margin: 0 }}>{ann.title}</p>
+                      <span className={`check-state ${ann.status === 'published' ? 'pass' : 'idle'}`}>
+                        {announcementStatusLabel(ann.status)}
+                      </span>
+                    </div>
+                    <p className="muted small">
+                      #{ann.id}
+                      {ann.created_by_name ? ` · ${ann.created_by_name}` : ''}
+                      {' · '}
+                      {new Date(ann.created_at).toLocaleString()}
+                    </p>
+                    <p className="small" style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap' }}>
+                      {ann.content}
+                    </p>
+                  </div>
+                  <div className="role-actions" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => {
+                        setEditingAnnouncement(ann)
+                        setAnnouncementFormOpen(true)
+                      }}
+                    >
+                      {t('adminAnnouncementEdit')}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => void toggleAnnouncementStatus(ann)}
+                    >
+                      {ann.status === 'published'
+                        ? t('adminAnnouncementUnpublish')
+                        : t('adminAnnouncementPublish')}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      style={{ color: '#c53030' }}
+                      onClick={() => void deleteAnnouncement(ann)}
+                    >
+                      {t('adminAnnouncementDelete')}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      <LogoutConfirmModal
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={logout}
+      />
+      <AnnouncementFormModal
+        open={announcementFormOpen}
+        editing={editingAnnouncement}
+        onClose={() => {
+          setAnnouncementFormOpen(false)
+          setEditingAnnouncement(null)
+        }}
+        onSaved={() => {
+          void loadAnnouncements()
+          void loadAuditLogs()
+        }}
+      />
+      <UserEditModal
+        open={userEditOpen}
+        user={editingUser}
+        onClose={() => {
+          setUserEditOpen(false)
+          setEditingUser(null)
+        }}
+        onSaved={() => {
+          void loadUsers()
+          void loadAuditLogs()
+          void adminApiService.listPendingClinicians().then(setApiPending).catch(() => {})
+        }}
+      />
     </div>
   )
 }

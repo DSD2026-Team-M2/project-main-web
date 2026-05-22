@@ -3,10 +3,48 @@
  * Requires a valid admin JWT (stored via authStore).
  */
 
-import type { ApiPatient, ApiSession } from '../types/api'
+import type { ApiPatient, ApiSession, ApiUserRole, ApiUserStatus, UpdateUserInput } from '../types/api'
 import { authStore } from './authStore'
 
 const BASE_URL = 'http://113.44.220.94:3000'
+
+function asList(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw
+  if (raw && typeof raw === 'object') {
+    const v = (raw as Record<string, unknown>).value
+    if (Array.isArray(v)) return v
+  }
+  return []
+}
+
+function normalizeUser(raw: unknown): ApiPatient | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = Number(o.id)
+  if (!Number.isFinite(id)) return null
+  const role = String(o.role ?? '') as ApiUserRole
+  if (role !== 'patient' && role !== 'clinician' && role !== 'admin') return null
+  const status = String(o.status ?? '') as ApiUserStatus
+  if (status !== 'active' && status !== 'pending' && status !== 'rejected' && status !== 'disabled') {
+    return null
+  }
+  const ageRaw = o.age
+  const age =
+    ageRaw == null || ageRaw === ''
+      ? null
+      : Number.isFinite(Number(ageRaw))
+        ? Number(ageRaw)
+        : null
+  return {
+    id,
+    name: String(o.name ?? ''),
+    email: String(o.email ?? ''),
+    role,
+    age,
+    status,
+    created_at: String(o.created_at ?? ''),
+  }
+}
 
 async function adminFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -28,7 +66,22 @@ async function adminFetch<T>(path: string, opts?: RequestInit): Promise<T> {
 export const adminApiService = {
   /** GET /users — all users */
   async listAllUsers(): Promise<ApiPatient[]> {
-    return adminFetch<ApiPatient[]>('/users')
+    const raw = await adminFetch<unknown>('/users')
+    return asList(raw)
+      .map(normalizeUser)
+      .filter((x): x is ApiPatient => x != null)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  },
+
+  /** PATCH /users/:id — update name, age, role, status */
+  async updateUser(id: number, input: UpdateUserInput): Promise<ApiPatient> {
+    const raw = await adminFetch<unknown>(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    })
+    const row = normalizeUser(raw)
+    if (!row) throw new Error(`[Admin API] PATCH /users/${id} returned invalid payload`)
+    return row
   },
 
   /** GET /users/:id — single user (may include license fields) */
@@ -67,10 +120,7 @@ export const adminApiService = {
     return adminFetch<void>(`/auth/approve/${userId}`, { method: 'PATCH' })
   },
 
-  /**
-   * PATCH /users/:id — reject clinician license (admin action).
-   * Backend said general user update endpoint accepts status updates incl. rejected/disabled.
-   */
+  /** PATCH /users/:id — reject clinician */
   async rejectClinician(userId: number): Promise<void> {
     return adminFetch<void>(`/users/${userId}`, {
       method: 'PATCH',
@@ -78,4 +128,3 @@ export const adminApiService = {
     })
   },
 }
-

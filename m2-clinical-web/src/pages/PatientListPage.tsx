@@ -5,6 +5,9 @@ import type { ApiPatient } from '../types/api'
 import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { LanguageSwitcher } from '../components/common/LanguageSwitcher'
+import { FeedbackSubmitModal } from '../components/doctor/FeedbackSubmitModal'
+import { LogoutConfirmModal } from '../components/common/LogoutConfirmModal'
+import { AnnouncementTicker } from '../components/common/AnnouncementTicker'
 import { useI18n } from '../i18n/I18nContext'
 import { authStore } from '../services/authStore'
 
@@ -16,6 +19,13 @@ export function PatientListPage() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [logoutOpen, setLogoutOpen] = useState(false)
+
+  function logout() {
+    authStore.clearToken()
+    navigate('/roles')
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -56,13 +66,29 @@ export function PatientListPage() {
           <button
             type="button"
             className="btn ghost"
-            onClick={() => { authStore.clearToken(); navigate('/roles') }}
+            onClick={() => setLogoutOpen(true)}
           >
             {t('logout')}
+          </button>
+          <button
+            type="button"
+            className="btn primary"
+            onClick={() => setFeedbackOpen(true)}
+          >
+            {t('submitFeedback')}
           </button>
           <LanguageSwitcher />
         </div>
       </header>
+
+      <AnnouncementTicker />
+
+      <FeedbackSubmitModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <LogoutConfirmModal
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={logout}
+      />
 
       <main style={{ maxWidth: 860, margin: '2rem auto', padding: '0 1.25rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
