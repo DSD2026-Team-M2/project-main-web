@@ -86,6 +86,12 @@ If JSON comes back, `Ctrl+C` the uvicorn.
 
 ### 5. Install as systemd service
 
+> Important: the unit file ships with `User=ubuntu` / `Group=ubuntu`. If your
+> server uses a different OS user (the one that ran `sudo chown` above), edit
+> `ai-recommend.service` and replace `ubuntu` with that username **before**
+> copying it to `/etc/systemd/system/`. Otherwise the service will fail to read
+> the files in `/opt/...`.
+
 ```bash
 sudo cp /opt/ai-service/ai-recommend.service /etc/systemd/system/
 sudo systemctl daemon-reload

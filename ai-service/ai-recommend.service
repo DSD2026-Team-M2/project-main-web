@@ -4,8 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-Group=www-data
+# Adjust User/Group to match the OS user that owns /opt/ai-service and
+# /opt/v1-motion-standard-curves (the user that ran `git clone` in the
+# deploy guide). On a default Ubuntu cloud image, that's usually `ubuntu`.
+User=ubuntu
+Group=ubuntu
 WorkingDirectory=/opt/ai-service
 Environment="BORGES_ROOT=/opt/v1-motion-standard-curves"
 Environment="PYTHON_BIN=/opt/v1-motion-standard-curves/.venv/bin/python"
