@@ -12,6 +12,7 @@ import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { useI18n } from '../i18n/I18nContext'
 import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
+import { AiCurveAnalysisCard } from '../components/doctor/AiCurveAnalysisCard'
 
 const PRIORITY_CLASS: Record<string, string> = {
   high: 'fail',
@@ -356,6 +357,9 @@ export function SessionDetailPage() {
               </div>
             )}
           </section>
+
+          {/* ── AI Curve Analysis (Borges/V1 motion module) ── */}
+          <AiCurveAnalysisCard sessionId={sid} />
         </>
       )}
     </div>
