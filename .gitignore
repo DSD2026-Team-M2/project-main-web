@@ -27,7 +27,6 @@ dist-ssr
 m2-clinical-web/scripts/*
 DSD2026-app-windows-main/*
 DSD2026-app-windows-main2/*
-v1-motion-standard-curves-main/*
 ai-service/__pycache__/*
 ai-service/.venv/*
 ai-service/.venv
