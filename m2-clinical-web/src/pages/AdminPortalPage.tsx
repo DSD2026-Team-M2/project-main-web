@@ -269,6 +269,12 @@ export function AdminPortalPage() {
     return 'fail'
   }
 
+  function assignedDoctorLabel(doctorId?: number | null): string {
+    if (!doctorId || doctorId <= 0) return t('adminUserDoctorUnassigned')
+    const doc = apiUsers.find((u) => u.id === doctorId)
+    return doc ? `${doc.name} (#${doc.id})` : `#${doctorId}`
+  }
+
   function feedbackStatusLabel(status: FeedbackStatus): string {
     if (status === 'pending') return t('adminFeedbackStatusPending')
     if (status === 'reviewed') return t('adminFeedbackStatusReviewed')
@@ -514,6 +520,9 @@ export function AdminPortalPage() {
                     <p className="muted small">
                       {u.email} · ID #{u.id}
                       {u.age != null ? ` · ${t('adminUserAgeLabel')} ${u.age}` : ''}
+                      {u.role === 'patient'
+                        ? ` · ${t('adminUserDoctorLabel')}: ${assignedDoctorLabel(u.doctor_id)}`
+                        : ''}
                       {' · '}
                       {t('adminJoined')} {u.created_at.slice(0, 10)}
                     </p>

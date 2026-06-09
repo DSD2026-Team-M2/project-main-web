@@ -10,8 +10,9 @@ Type=simple
 User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/ai-service
-Environment="BORGES_ROOT=/opt/v1-motion-standard-curves"
-Environment="PYTHON_BIN=/opt/v1-motion-standard-curves/.venv/bin/python"
+Environment="BORGES_ROOT=/opt/v1-motion-standard-curves-main"
+# PYTHON_BIN omitted — ai_service defaults to sys.executable (same venv as uvicorn below)
+Environment="MEASUREMENTS_BASE_URL=http://113.44.220.94:3000/measurements"
 Environment="SCRIPT_TIMEOUT_SEC=90"
 ExecStart=/opt/ai-service/.venv/bin/uvicorn ai_service:app --host 0.0.0.0 --port 8001
 Restart=on-failure

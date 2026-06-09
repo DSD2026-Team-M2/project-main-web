@@ -11,6 +11,8 @@ export type ApiPatient = {
   age: number | null
   status: ApiUserStatus
   created_at: string
+  /** Assigned clinician user id; 0 or null means unassigned. Present on admin GET /users. */
+  doctor_id?: number | null
 }
 
 export type UpdateUserInput = {
@@ -18,6 +20,7 @@ export type UpdateUserInput = {
   age?: number | null
   role?: ApiUserRole
   status?: ApiUserStatus
+  doctorId?: number | null
 }
 
 export type ApiSession = {

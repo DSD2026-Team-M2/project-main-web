@@ -5,6 +5,20 @@
 
 export type AiCurveAction = 'walking' | 'squat' | 'upstairs'
 
+export type StandardCurvePoint = {
+  percent: number
+  angle: number
+  bandLow?: number
+  bandHigh?: number
+}
+
+export type StandardCurveResponse = {
+  action: AiCurveAction
+  angleID: string
+  source: string
+  points: StandardCurvePoint[]
+}
+
 export type AiCurveStatus = 'normal' | 'mild_deviation' | 'significant_deviation'
 export type AiCurveConfidence = 'high' | 'medium' | 'low'
 

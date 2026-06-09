@@ -1,14 +1,8 @@
 /**
- * AiCurveAnalysisCard
- * Cartão completo para o botão "Generate AI Curve Analysis" na SessionDetailPage.
- * - Dropdown de action (walking/squat/upstairs)
- * - Botão "Gerar" → chama o wrapper FastAPI no servidor
- * - Botão "Preview sample" → carrega um JSON estático para testar a UI sem o backend
- * - Estados loading/erro
- * - Renderização do JSON devolvido
+ * AiCurveAnalysisCard — session detail card for Borges curve-based AI recommendations.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { aiRecommendationApiService } from '../../services/aiRecommendationApiService'
 import type {
   AiCurveAction,
@@ -17,6 +11,7 @@ import type {
 } from '../../types/aiRecommendation'
 import { LoadingBlock } from '../common/LoadingBlock'
 import { ErrorBanner } from '../common/ErrorBanner'
+import { useI18n } from '../../i18n/I18nContext'
 
 const STATUS_CLASS: Record<AiCurveStatus, string> = {
   normal: 'pass',
@@ -24,23 +19,58 @@ const STATUS_CLASS: Record<AiCurveStatus, string> = {
   significant_deviation: 'fail',
 }
 
-const STATUS_LABEL: Record<AiCurveStatus, string> = {
-  normal: 'Normal',
-  mild_deviation: 'Mild deviation',
-  significant_deviation: 'Significant deviation',
-}
-
 const ACTION_OPTIONS: AiCurveAction[] = ['walking', 'squat', 'upstairs']
+
+const COMPONENT_KEYS = [
+  'overall',
+  'shape',
+  'rangeOfMotion',
+  'verticalOffset',
+  'standardBand',
+] as const
 
 type Props = {
   sessionId: number
 }
 
 export function AiCurveAnalysisCard({ sessionId }: Props) {
+  const { t } = useI18n()
   const [action, setAction] = useState<AiCurveAction>('walking')
   const [data, setData] = useState<AiCurveRecommendation | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+
+  const statusLabel = useMemo(
+    () =>
+      ({
+        normal: t('aiCurveStatusNormal'),
+        mild_deviation: t('aiCurveStatusMild'),
+        significant_deviation: t('aiCurveStatusSignificant'),
+      }) satisfies Record<AiCurveStatus, string>,
+    [t],
+  )
+
+  const actionLabel = useMemo(
+    () =>
+      ({
+        walking: t('aiCurveActionWalking'),
+        squat: t('aiCurveActionSquat'),
+        upstairs: t('aiCurveActionUpstairs'),
+      }) satisfies Record<AiCurveAction, string>,
+    [t],
+  )
+
+  const componentLabel = useMemo(
+    () =>
+      ({
+        overall: t('aiCurveCompOverall'),
+        shape: t('aiCurveCompShape'),
+        rangeOfMotion: t('aiCurveCompRangeOfMotion'),
+        verticalOffset: t('aiCurveCompVerticalOffset'),
+        standardBand: t('aiCurveCompStandardBand'),
+      }) satisfies Record<(typeof COMPONENT_KEYS)[number], string>,
+    [t],
+  )
 
   async function handleGenerate() {
     setLoading(true)
@@ -62,7 +92,7 @@ export function AiCurveAnalysisCard({ sessionId }: Props) {
 
   return (
     <section className="card" style={{ marginTop: '1rem' }}>
-      <h2 className="card-title">AI Curve Analysis</h2>
+      <h2 className="card-title">{t('aiCurveTitle')}</h2>
 
       <div
         style={{
@@ -74,7 +104,7 @@ export function AiCurveAnalysisCard({ sessionId }: Props) {
         }}
       >
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="muted small">Action</span>
+          <span className="muted small">{t('aiCurveAction')}</span>
           <select
             value={action}
             onChange={(e) => setAction(e.target.value as AiCurveAction)}
@@ -82,7 +112,7 @@ export function AiCurveAnalysisCard({ sessionId }: Props) {
           >
             {ACTION_OPTIONS.map((a) => (
               <option key={a} value={a}>
-                {a}
+                {actionLabel[a]}
               </option>
             ))}
           </select>
@@ -93,32 +123,50 @@ export function AiCurveAnalysisCard({ sessionId }: Props) {
           disabled={loading}
           onClick={() => void handleGenerate()}
         >
-          {data ? 'Re-generate' : 'Generate AI recommendation'}
+          {data ? t('aiCurveRegenerate') : t('aiCurveGenerate')}
         </button>
-        {/* Botão extra para testar a UI sem o backend ligado.
-            Remover quando o wrapper FastAPI estiver em produção. */}
-        <button
-          type="button"
-          className="btn ghost"
-          disabled={loading}
-          onClick={handleLoadSample}
-          title="Carrega um exemplo estático (sem chamar o servidor)"
-        >
-          Preview sample (dev)
-        </button>
+        {import.meta.env.DEV ? (
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={loading}
+            onClick={handleLoadSample}
+            title={t('aiCurvePreviewSampleTitle')}
+          >
+            {t('aiCurvePreviewSample')}
+          </button>
+        ) : null}
       </div>
 
-      {loading && <LoadingBlock label="A correr o motor de análise…" />}
+      {loading && <LoadingBlock label={t('aiCurveLoading')} />}
       {err && <ErrorBanner message={err} />}
 
-      {data && !loading && <Result data={data} />}
+      {data && !loading && (
+        <Result
+          data={data}
+          statusLabel={statusLabel}
+          actionLabel={actionLabel}
+          componentLabel={componentLabel}
+          t={t}
+        />
+      )}
     </section>
   )
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
-
-function Result({ data }: { data: AiCurveRecommendation }) {
+function Result({
+  data,
+  statusLabel,
+  actionLabel,
+  componentLabel,
+  t,
+}: {
+  data: AiCurveRecommendation
+  statusLabel: Record<AiCurveStatus, string>
+  actionLabel: Record<AiCurveAction, string>
+  componentLabel: Record<(typeof COMPONENT_KEYS)[number], string>
+  t: (key: string, vars?: Record<string, string | number>) => string
+}) {
   return (
     <div>
       <div
@@ -131,11 +179,13 @@ function Result({ data }: { data: AiCurveRecommendation }) {
         }}
       >
         <span className={`check-state ${STATUS_CLASS[data.status]}`}>
-          {STATUS_LABEL[data.status]}
+          {statusLabel[data.status]}
         </span>
-        <span className="check-state idle">Confidence: {data.confidence}</span>
+        <span className="check-state idle">
+          {t('aiCurveConfidence', { level: data.confidence })}
+        </span>
         <span className="muted small" style={{ marginLeft: 'auto' }}>
-          {data.action} · {data.angleID} · v{data.comparisonVersion}
+          {actionLabel[data.action]} · {data.angleID} · v{data.comparisonVersion}
         </span>
       </div>
 
@@ -146,7 +196,8 @@ function Result({ data }: { data: AiCurveRecommendation }) {
         style={{ marginBottom: '0.75rem', background: 'rgba(0,0,0,0.03)' }}
       >
         <p className="muted small" style={{ marginBottom: '0.25rem' }}>
-          Clinical advice (draft) · priority: {data.clinicalAdviceDraft.reviewPriority}
+          {t('aiCurveClinicalAdvice')} ·{' '}
+          {t('aiCurveReviewPriority', { priority: data.clinicalAdviceDraft.reviewPriority })}
         </p>
         <p style={{ marginBottom: '0.5rem' }}>{data.clinicalAdviceDraft.draftAdvice}</p>
         {data.clinicalAdviceDraft.focusAreas?.length > 0 && (
@@ -174,26 +225,24 @@ function Result({ data }: { data: AiCurveRecommendation }) {
 
       <div style={{ marginBottom: '0.75rem' }}>
         <p className="muted small" style={{ marginBottom: '0.25rem' }}>
-          Component status
+          {t('aiCurveComponentStatus')}
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-          {(['overall', 'shape', 'rangeOfMotion', 'verticalOffset', 'standardBand'] as const).map(
-            (k) => (
-              <span
-                key={k}
-                className={`check-state ${STATUS_CLASS[data.componentStatus[k]]}`}
-                style={{ fontSize: '0.75rem' }}
-              >
-                {k}: {data.componentStatus[k].replaceAll('_', ' ')}
-              </span>
-            ),
-          )}
+          {COMPONENT_KEYS.map((k) => (
+            <span
+              key={k}
+              className={`check-state ${STATUS_CLASS[data.componentStatus[k]]}`}
+              style={{ fontSize: '0.75rem' }}
+            >
+              {componentLabel[k]}: {statusLabel[data.componentStatus[k]]}
+            </span>
+          ))}
         </div>
       </div>
 
       <div style={{ marginBottom: '0.75rem' }}>
         <p className="muted small" style={{ marginBottom: '0.25rem' }}>
-          Key metrics
+          {t('aiCurveKeyMetrics')}
         </p>
         <div
           style={{
@@ -202,16 +251,25 @@ function Result({ data }: { data: AiCurveRecommendation }) {
             gap: '0.5rem',
           }}
         >
-          <Metric label="RMSE" value={`${data.metrics.rmse.toFixed(2)}°`} />
-          <Metric label="Amplitude diff" value={`${data.metrics.amplitudeDifference.toFixed(2)}°`} />
-          <Metric label="Peak angle diff" value={`${data.metrics.peakAngleDifference.toFixed(2)}°`} />
+          <Metric label={t('aiCurveMetricRmse')} value={`${data.metrics.rmse.toFixed(2)}°`} />
           <Metric
-            label="Range of motion"
+            label={t('aiCurveMetricAmplitudeDiff')}
+            value={`${data.metrics.amplitudeDifference.toFixed(2)}°`}
+          />
+          <Metric
+            label={t('aiCurveMetricPeakAngleDiff')}
+            value={`${data.metrics.peakAngleDifference.toFixed(2)}°`}
+          />
+          <Metric
+            label={t('aiCurveMetricRom')}
             value={`${data.metrics.rangeOfMotionPercentOfStandard.toFixed(1)}%`}
           />
-          <Metric label="Correlation" value={data.metrics.correlation.toFixed(3)} />
           <Metric
-            label="Outside band"
+            label={t('aiCurveMetricCorrelation')}
+            value={data.metrics.correlation.toFixed(3)}
+          />
+          <Metric
+            label={t('aiCurveMetricOutsideBand')}
             value={`${data.metrics.outsideStandardBandPercent.toFixed(1)}%`}
           />
         </div>
@@ -220,7 +278,7 @@ function Result({ data }: { data: AiCurveRecommendation }) {
       {data.observations.length > 0 && (
         <div style={{ marginBottom: '0.75rem' }}>
           <p className="muted small" style={{ marginBottom: '0.25rem' }}>
-            Observations
+            {t('aiCurveObservations')}
           </p>
           <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
             {data.observations.map((o, i) => (
@@ -241,7 +299,7 @@ function Result({ data }: { data: AiCurveRecommendation }) {
           }}
         >
           <p className="small" style={{ margin: 0, fontWeight: 600 }}>
-            Quality notes
+            {t('aiCurveQualityNotes')}
           </p>
           <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.2rem' }}>
             {data.qualityNotes.map((q, i) => (
@@ -284,9 +342,6 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
-// ── Sample data ─────────────────────────────────────────────────────────────
-// JSON real obtido a correr o script para a sessão 209 (walking).
-// Permite testar a UI sem o wrapper backend estar ligado.
 const SAMPLE_RECOMMENDATION: AiCurveRecommendation = {
   action: 'walking',
   angleID: 'left_knee',

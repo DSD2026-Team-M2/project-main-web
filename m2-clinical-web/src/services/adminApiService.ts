@@ -35,6 +35,13 @@ function normalizeUser(raw: unknown): ApiPatient | null {
       : Number.isFinite(Number(ageRaw))
         ? Number(ageRaw)
         : null
+  const doctorRaw = o.doctor_id ?? o.doctorId
+  const doctor_id =
+    doctorRaw == null || doctorRaw === ''
+      ? null
+      : Number.isFinite(Number(doctorRaw))
+        ? Number(doctorRaw)
+        : null
   return {
     id,
     name: String(o.name ?? ''),
@@ -43,6 +50,7 @@ function normalizeUser(raw: unknown): ApiPatient | null {
     age,
     status,
     created_at: String(o.created_at ?? ''),
+    doctor_id,
   }
 }
 
@@ -73,7 +81,13 @@ export const adminApiService = {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   },
 
-  /** PATCH /users/:id — update name, age, role, status */
+  /** GET /users?role=clinician — active clinicians for doctor assignment */
+  async listActiveClinicians(): Promise<ApiPatient[]> {
+    const users = await adminApiService.listAllUsers()
+    return users.filter((u) => u.role === 'clinician' && u.status === 'active')
+  },
+
+  /** PATCH /users/:id — update name, age, role, status, doctorId */
   async updateUser(id: number, input: UpdateUserInput): Promise<ApiPatient> {
     const raw = await adminFetch<unknown>(`/users/${id}`, {
       method: 'PATCH',

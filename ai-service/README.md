@@ -1,59 +1,180 @@
 # ai-service — AI Recommendation Wrapper
 
 FastAPI micro-service that wraps Borges's `generate_recommendation_from_curves.py`
-(from https://github.com/abenjas69/v1-motion-standard-curves) and exposes it as
-an HTTP endpoint consumed by the dashboard's "AI Curve Analysis" card.
+and exposes it to the M2 clinical dashboard.
+
+**Runs on Windows (local dev) and Ubuntu (production server).**
 
 ## What it does
 
 ```
-[Frontend POST /ai/recommend  {action, sessionId}]
+[Frontend — dev: /ai-api proxy | prod: VITE_AI_URL]
               │
               ▼
 [FastAPI on :8001]
-              │  subprocess: generate_recommendation_from_curves.py
+    GET  /ai/standard-curve?action=walking   → standard CSV for chart overlay
+    POST /ai/recommend {action, sessionId}   → subprocess Borges script
+              │
               ▼
-[Borges's script] ──fetch──> V2 API /measurements/:sessionId
-              │  writes /tmp/.../rec.json
+[v1-motion-standard-curves-main/generate_recommendation_from_curves.py]
+              │  fetch V2 /measurements/:sessionId
               ▼
-[Wrapper returns JSON]
+[JSON returned to frontend]
 ```
+
+## Prerequisites
+
+| Item | Notes |
+|---|---|
+| Python 3.10+ | `python --version` |
+| `v1-motion-standard-curves-main/` | Sibling folder of `ai-service/` (auto-detected) |
+| Standard CSVs | Must exist under `outputs/walking`, `outputs/squat`, `outputs/upstairs` |
+| V2 API reachable | Default `http://113.44.220.94:3000/measurements` (for AI generation) |
+
+Standard CSV paths used by the wrapper:
+
+| action | file |
+|---|---|
+| walking | `outputs/walking/normal_knee_curve.csv` |
+| squat | `outputs/squat/standard_squat_curve.csv` |
+| upstairs | `outputs/upstairs/standard_upstairs_curve.csv` |
 
 ## Files
 
-- `ai_service.py` — FastAPI app (~120 lines), endpoint `POST /ai/recommend`
+- `ai_service.py` — FastAPI app: `GET /health`, `GET /ai/standard-curve`, `POST /ai/recommend`
 - `requirements.txt` — fastapi + uvicorn + pydantic
-- `ai-recommend.service` — systemd unit so the service auto-starts on boot
+- `ai-recommend.service` — systemd unit (Ubuntu only)
 
-## Deploy (Ubuntu server)
+---
 
-> Run once.
+## Windows — local development
 
-### 1. Clone Borges's repo at `/opt/v1-motion-standard-curves`
+Typical layout (your machine):
 
-```bash
-sudo mkdir -p /opt
-cd /opt
-sudo git clone https://github.com/abenjas69/v1-motion-standard-curves.git
-sudo chown -R "$USER:$USER" /opt/v1-motion-standard-curves
-cd v1-motion-standard-curves
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+```text
+E:\School\project-main-web\
+  ai-service\                  ← this wrapper
+  v1-motion-standard-curves-main\   ← Borges scripts + outputs (do not edit)
+  m2-clinical-web\             ← React frontend
 ```
 
-### 2. Smoke-test Borges's script
+### 1. One-time setup
+
+Open **PowerShell**:
+
+```powershell
+cd E:\School\project-main-web\ai-service
+
+# Optional but recommended: virtual environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt
+```
+
+If script activation is blocked:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+### 2. Smoke-test Borges script (optional)
+
+```powershell
+cd E:\School\project-main-web\v1-motion-standard-curves-main
+
+python generate_recommendation_from_curves.py `
+  --action walking `
+  --patient-session-id 209 `
+  --standard-csv outputs/walking/normal_knee_curve.csv `
+  --base-url http://113.44.220.94:3000/measurements `
+  --out-json $env:TEMP\test_rec.json `
+  --out-txt $env:TEMP\test_rec.txt
+
+Get-Content $env:TEMP\test_rec.json -Head 20
+```
+
+If JSON appears, Borges + V2 API are working.
+
+### 3. Start ai-service (terminal 1)
+
+```powershell
+cd E:\School\project-main-web\ai-service
+.\.venv\Scripts\Activate.ps1   # if using venv
+
+# BORGES_ROOT is auto-detected as ..\v1-motion-standard-curves-main
+uvicorn ai_service:app --host 127.0.0.1 --port 8001 --reload
+```
+
+Override paths if needed:
+
+```powershell
+$env:BORGES_ROOT = "E:\School\project-main-web\v1-motion-standard-curves-main"
+$env:PYTHON_BIN = "python"
+$env:MEASUREMENTS_BASE_URL = "http://113.44.220.94:3000/measurements"
+uvicorn ai_service:app --host 127.0.0.1 --port 8001 --reload
+```
+
+### 4. Verify endpoints (another PowerShell window)
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8001/health
+Invoke-RestMethod "http://127.0.0.1:8001/ai/standard-curve?action=walking"
+
+Invoke-RestMethod http://127.0.0.1:8001/ai/recommend `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"action":"walking","sessionId":209}'
+```
+
+### 5. Start frontend (terminal 2)
+
+```powershell
+cd E:\School\project-main-web\m2-clinical-web
+npm run dev
+```
+
+Open `http://localhost:5173`, go to a **session detail** page:
+
+- Chart: check **「叠加标准曲线对照」** + pick action → orange dashed standard line
+- Bottom card: **「生成 AI 建议」**
+
+In dev, Vite proxies `/ai-api` → `http://127.0.0.1:8001` — no need to expose port 8001 to the browser directly.
+
+### Windows notes
+
+| Topic | Detail |
+|---|---|
+| Can it run? | **Yes** — FastAPI + subprocess work on Windows |
+| Auto-start on boot | No systemd; keep a terminal open, or use NSSM / Task Scheduler if needed later |
+| `python` vs `python3` | On Windows use `python`; set `PYTHON_BIN=python` if you override env |
+| Firewall | Local dev uses `127.0.0.1` only — no inbound rule needed |
+| Production on Windows Server | Possible (same uvicorn command, bind `0.0.0.0`), but team currently targets Ubuntu |
+
+---
+
+## Ubuntu — production server
+
+### 1. Place Borges repo
 
 ```bash
-.venv/bin/python generate_recommendation_from_curves.py \
+sudo mkdir -p /opt/v1-motion-standard-curves-main
+# copy v1-motion-standard-curves-main contents (must include outputs/... CSVs)
+sudo chown -R "$USER:$USER" /opt/v1-motion-standard-curves-main
+```
+
+### 2. Smoke-test Borges script
+
+```bash
+cd /opt/v1-motion-standard-curves-main
+python3 generate_recommendation_from_curves.py \
   --action walking --patient-session-id 209 \
   --standard-csv outputs/walking/normal_knee_curve.csv \
-  --out-json /tmp/test.json --out-txt /tmp/test.txt --out-html /tmp/test.html
+  --out-json /tmp/test.json --out-txt /tmp/test.txt
 head -20 /tmp/test.json
 ```
 
-If you see JSON, it works.
-
-### 3. Install this wrapper at `/opt/ai-service`
+### 3. Install wrapper
 
 ```bash
 sudo mkdir -p /opt/ai-service
@@ -64,92 +185,92 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-### 4. Test the wrapper manually
+### 4. Test manually
 
 ```bash
 cd /opt/ai-service
-BORGES_ROOT=/opt/v1-motion-standard-curves \
-PYTHON_BIN=/opt/v1-motion-standard-curves/.venv/bin/python \
+BORGES_ROOT=/opt/v1-motion-standard-curves-main \
+MEASUREMENTS_BASE_URL=http://113.44.220.94:3000/measurements \
 .venv/bin/uvicorn ai_service:app --host 0.0.0.0 --port 8001
 ```
 
-In another terminal:
-
 ```bash
 curl http://localhost:8001/health
+curl "http://localhost:8001/ai/standard-curve?action=walking"
 curl -X POST http://localhost:8001/ai/recommend \
   -H 'Content-Type: application/json' \
-  -d '{"action":"walking","sessionId":209}' | head -20
+  -d '{"action":"walking","sessionId":209}'
 ```
 
-If JSON comes back, `Ctrl+C` the uvicorn.
+### 5. systemd service
 
-### 5. Install as systemd service
-
-> Important: the unit file ships with `User=ubuntu` / `Group=ubuntu`. If your
-> server uses a different OS user (the one that ran `sudo chown` above), edit
-> `ai-recommend.service` and replace `ubuntu` with that username **before**
-> copying it to `/etc/systemd/system/`. Otherwise the service will fail to read
-> the files in `/opt/...`.
+Edit `ai-recommend.service` if the OS user is not `ubuntu`, then:
 
 ```bash
 sudo cp /opt/ai-service/ai-recommend.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable ai-recommend
 sudo systemctl start ai-recommend
-sudo systemctl status ai-recommend     # should say active (running)
+sudo systemctl status ai-recommend
 ```
 
-### 6. Open port 8001 (if firewall is on)
+### 6. Firewall
 
 ```bash
 sudo ufw allow 8001/tcp
-```
-
-### 7. Verify from outside
-
-```bash
 curl http://113.44.220.94:8001/health
 ```
 
-Expected: `{"ok": true, "scriptExists": true, "borgesRoot": "/opt/v1-motion-standard-curves"}`
+### 7. Frontend production
 
-## Logs
+Set in `m2-clinical-web` build env:
 
-```bash
-sudo journalctl -u ai-recommend -f
+```text
+VITE_AI_URL=http://113.44.220.94:8001
 ```
+
+---
 
 ## API
 
 ### `GET /health`
 
-Sanity check. Returns whether the script is reachable.
+Returns `borgesRoot`, whether the script and standard CSVs exist.
+
+### `GET /ai/standard-curve?action=walking`
+
+Returns `{ action, angleID, source, points[] }` for chart overlay.
 
 ### `POST /ai/recommend`
 
 Body:
+
 ```json
 { "action": "walking", "sessionId": 209 }
 ```
 
-`action` must be one of: `walking`, `squat`, `upstairs`.
+`action`: `walking` | `squat` | `upstairs`.
 
-Returns the full JSON produced by `generate_recommendation_from_curves.py`
-(status, confidence, metrics, observations, clinicalAdviceDraft, ...).
+Returns full Borges JSON (status, metrics, observations, clinicalAdviceDraft, …).
 
 ## Configuration (env vars)
 
 | Var | Default | Description |
 |---|---|---|
-| `BORGES_ROOT` | `/opt/v1-motion-standard-curves` | Where Borges's repo lives |
-| `PYTHON_BIN` | `python3` | Python interpreter (use the venv one) |
+| `BORGES_ROOT` | `../v1-motion-standard-curves-main` (relative to `ai_service.py`) | Borges repo path |
+| `PYTHON_BIN` | `sys.executable` (same Python as uvicorn) | Override only if Borges needs another venv |
+| `MEASUREMENTS_BASE_URL` | `http://113.44.220.94:3000/measurements` | V2 API base passed to Borges `--base-url` |
 | `SCRIPT_TIMEOUT_SEC` | `90` | Subprocess timeout |
 
-These are set in the systemd unit; edit `/etc/systemd/system/ai-recommend.service`
-if paths differ, then `sudo systemctl daemon-reload && sudo systemctl restart ai-recommend`.
+On Ubuntu these are set in `ai-recommend.service`.
+
+## Logs (Ubuntu)
+
+```bash
+sudo journalctl -u ai-recommend -f
+```
 
 ## CORS
 
-The wrapper currently accepts requests from any origin (`allow_origins=["*"]`).
-Tighten this once the production frontend domain is known.
+The wrapper accepts all origins (`allow_origins=["*"]`) for development.
+Tighten in production once the frontend domain is fixed.

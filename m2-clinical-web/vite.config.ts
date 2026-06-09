@@ -6,4 +6,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => ({
   base: mode === 'production' ? '/project-main-web/' : '/',
   plugins: [react()],
+  server: {
+    proxy: {
+      '/ai-api': {
+        target: 'http://127.0.0.1:8001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ai-api/, ''),
+      },
+    },
+  },
 }))

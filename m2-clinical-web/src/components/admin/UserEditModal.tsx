@@ -12,6 +12,7 @@ type Props = {
 
 const ROLES: ApiUserRole[] = ['patient', 'clinician', 'admin']
 const STATUSES: ApiUserStatus[] = ['active', 'pending', 'rejected', 'disabled']
+const UNASSIGNED_DOCTOR = '0'
 
 export function UserEditModal({ open, user, onClose, onSaved }: Props) {
   const { t } = useI18n()
@@ -19,6 +20,9 @@ export function UserEditModal({ open, user, onClose, onSaved }: Props) {
   const [age, setAge] = useState('')
   const [role, setRole] = useState<ApiUserRole>('patient')
   const [status, setStatus] = useState<ApiUserStatus>('active')
+  const [doctorId, setDoctorId] = useState(UNASSIGNED_DOCTOR)
+  const [clinicians, setClinicians] = useState<ApiPatient[]>([])
+  const [cliniciansLoading, setCliniciansLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,7 +32,15 @@ export function UserEditModal({ open, user, onClose, onSaved }: Props) {
     setAge(user.age == null ? '' : String(user.age))
     setRole(user.role)
     setStatus(user.status)
+    setDoctorId(String(user.doctor_id && user.doctor_id > 0 ? user.doctor_id : UNASSIGNED_DOCTOR))
     setError(null)
+
+    setCliniciansLoading(true)
+    adminApiService
+      .listActiveClinicians()
+      .then(setClinicians)
+      .catch(() => setClinicians([]))
+      .finally(() => setCliniciansLoading(false))
   }, [open, user])
 
   if (!open || !user) return null
@@ -56,12 +68,16 @@ export function UserEditModal({ open, user, onClose, onSaved }: Props) {
     setSubmitting(true)
     setError(null)
     try {
-      await adminApiService.updateUser(user.id, {
+      const payload: Parameters<typeof adminApiService.updateUser>[1] = {
         name: nameText,
         age: ageValue,
         role,
         status,
-      })
+      }
+      if (role === 'patient') {
+        payload.doctorId = Number(doctorId) || 0
+      }
+      await adminApiService.updateUser(user.id, payload)
       onSaved()
       resetAndClose()
     } catch (e) {
@@ -124,6 +140,31 @@ export function UserEditModal({ open, user, onClose, onSaved }: Props) {
             </option>
           ))}
         </select>
+        {role === 'patient' ? (
+          <>
+            <label className="muted small" htmlFor="user-edit-doctor" style={{ display: 'block', marginTop: 10 }}>
+              {t('adminUserDoctorLabel')}
+            </label>
+            <select
+              id="user-edit-doctor"
+              className="patient-select"
+              style={{ width: '100%', marginTop: 4, boxSizing: 'border-box' }}
+              value={doctorId}
+              onChange={(e) => setDoctorId(e.target.value)}
+              disabled={submitting || cliniciansLoading}
+            >
+              <option value={UNASSIGNED_DOCTOR}>{t('adminUserDoctorUnassigned')}</option>
+              {clinicians.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name} (#{c.id})
+                </option>
+              ))}
+            </select>
+            {cliniciansLoading ? (
+              <p className="muted small" style={{ marginTop: 4 }}>{t('adminUserDoctorLoading')}</p>
+            ) : null}
+          </>
+        ) : null}
         <label className="muted small" htmlFor="user-edit-status" style={{ display: 'block', marginTop: 10 }}>
           {t('adminUserStatusLabel')}
         </label>
