@@ -11,6 +11,11 @@ import type {
   ApiEngineRecommendation,
   ApiScheduleItem,
   CreateScheduleInput,
+  ApiExerciseCatalogItem,
+  ApiScheduleDetail,
+  ApiScheduleExercise,
+  CreateScheduleExerciseInput,
+  ApiPainLog,
 } from '../types/api'
 import type { HistoryRecord, TrendSeries } from '../types/clinical'
 import { authStore } from './authStore'
@@ -56,6 +61,12 @@ function normalizeApiScheduleItem(raw: unknown): ApiScheduleItem | null {
   const status = normalizeScheduleStatus(o.status)
   if (!status) return null
   const createdAt = typeof o.created_at === 'string' ? o.created_at : undefined
+  const doctorName =
+    typeof o.doctor_name === 'string'
+      ? o.doctor_name
+      : typeof o.doctorName === 'string'
+        ? o.doctorName
+        : undefined
   return {
     id,
     user_id: Number.isFinite(userId) ? userId : 0,
@@ -65,7 +76,115 @@ function normalizeApiScheduleItem(raw: unknown): ApiScheduleItem | null {
     notes: String(o.notes ?? ''),
     status,
     ...(createdAt ? { created_at: createdAt } : {}),
+    ...(doctorName ? { doctor_name: doctorName } : {}),
   }
+}
+
+function normalizeApiExerciseCatalogItem(raw: unknown): ApiExerciseCatalogItem | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = Number(o.id)
+  if (!Number.isFinite(id)) return null
+  return {
+    id,
+    name: String(o.name ?? ''),
+    category: String(o.category ?? ''),
+    description: String(o.description ?? ''),
+    gif_url: typeof o.gif_url === 'string' ? o.gif_url : null,
+    thumbnail_url: typeof o.thumbnail_url === 'string' ? o.thumbnail_url : null,
+  }
+}
+
+function normalizeApiScheduleExercise(raw: unknown): ApiScheduleExercise | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = Number(o.id)
+  if (!Number.isFinite(id)) return null
+  const hold = Number(o.holdSeconds ?? o.hold_seconds)
+  const lastPain = o.lastPainLevel ?? o.last_pain_level
+  return {
+    id,
+    name: String(o.name ?? ''),
+    phase: String(o.phase ?? ''),
+    sets: Number(o.sets) || 0,
+    reps: Number(o.reps) || 0,
+    holdSeconds: Number.isFinite(hold) ? hold : 0,
+    notes: String(o.notes ?? ''),
+    gif_url: typeof o.gif_url === 'string' ? o.gif_url : null,
+    description: String(o.description ?? ''),
+    completed: Boolean(o.completed),
+    lastPainLevel:
+      lastPain == null || lastPain === ''
+        ? null
+        : Number.isFinite(Number(lastPain))
+          ? Number(lastPain)
+          : null,
+  }
+}
+
+function normalizeApiScheduleDetail(raw: unknown): ApiScheduleDetail | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const scheduleId = Number(o.scheduleId ?? o.schedule_id ?? o.id)
+  if (!Number.isFinite(scheduleId)) return null
+  const status = normalizeScheduleStatus(o.status)
+  if (!status) return null
+  const exercisesRaw = o.exercises
+  const exercises = Array.isArray(exercisesRaw)
+    ? exercisesRaw.map(normalizeApiScheduleExercise).filter((x): x is ApiScheduleExercise => x != null)
+    : []
+  return {
+    scheduleId,
+    exercise: String(o.exercise ?? ''),
+    date: String(o.date ?? ''),
+    duration: Number(o.duration) || 0,
+    notes: String(o.notes ?? ''),
+    status,
+    doctorName: String(o.doctorName ?? o.doctor_name ?? ''),
+    exercises,
+  }
+}
+
+function sortScheduleItemsNewestFirst(items: ApiScheduleItem[]): ApiScheduleItem[] {
+  return [...items].sort((a, b) => {
+    const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime()
+    if (dateDiff !== 0) return dateDiff
+    const createdA = a.created_at ? new Date(a.created_at).getTime() : 0
+    const createdB = b.created_at ? new Date(b.created_at).getTime() : 0
+    const createdDiff = createdB - createdA
+    if (createdDiff !== 0) return createdDiff
+    return b.id - a.id
+  })
+}
+
+function normalizeApiPainLog(raw: unknown): ApiPainLog | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = Number(o.id)
+  const level = Number(o.level)
+  if (!Number.isFinite(id) || !Number.isFinite(level)) return null
+  const userId = Number(o.user_id ?? o.userId)
+  const createdAt = typeof o.created_at === 'string' ? o.created_at : ''
+  const notes = o.notes == null ? null : String(o.notes)
+  return {
+    id,
+    user_id: Number.isFinite(userId) ? userId : 0,
+    level,
+    notes,
+    created_at: createdAt,
+  }
+}
+
+async function publicApiFetch<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`[API] GET ${path} → ${res.status}: ${body}`)
+  }
+  const text = await res.text()
+  return text ? (JSON.parse(text) as T) : (null as T)
 }
 
 function normalizeApiMeasurement(raw: unknown): ApiMeasurement | null {
@@ -125,9 +244,18 @@ export const patientApiService = {
 
   // POST /schedule
   async createScheduleItem(input: CreateScheduleInput): Promise<ApiScheduleItem> {
+    const body: Record<string, unknown> = {
+      userId: input.userId,
+      user_id: input.userId,
+      exercise: input.exercise,
+      date: input.date,
+      duration: input.duration,
+      notes: input.notes,
+    }
+    if (input.status) body.status = input.status
     const raw = await apiFetch<unknown>('/schedule', {
       method: 'POST',
-      body: JSON.stringify(input),
+      body: JSON.stringify(body),
     })
     const item = normalizeApiScheduleItem(raw)
     if (!item) {
@@ -140,7 +268,48 @@ export const patientApiService = {
   async listSchedule(userId: number): Promise<ApiScheduleItem[]> {
     const raw = await apiFetch<unknown>(`/schedule/${userId}`)
     if (!Array.isArray(raw)) return []
-    return raw.map(normalizeApiScheduleItem).filter((x): x is ApiScheduleItem => x != null)
+    const items = raw.map(normalizeApiScheduleItem).filter((x): x is ApiScheduleItem => x != null)
+    return sortScheduleItemsNewestFirst(items)
+  },
+
+  // GET /schedule/:scheduleId/exercises
+  async getScheduleDetail(scheduleId: number): Promise<ApiScheduleDetail> {
+    const raw = await apiFetch<unknown>(`/schedule/${scheduleId}/exercises`)
+    const detail = normalizeApiScheduleDetail(raw)
+    if (!detail) {
+      throw new Error(`[API] GET /schedule/${scheduleId}/exercises returned invalid payload`)
+    }
+    return detail
+  },
+
+  // POST /schedule/:scheduleId/exercises
+  async addScheduleExercise(
+    scheduleId: number,
+    input: CreateScheduleExerciseInput,
+  ): Promise<ApiScheduleExercise> {
+    const raw = await apiFetch<unknown>(`/schedule/${scheduleId}/exercises`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+    const item = normalizeApiScheduleExercise(raw)
+    if (!item) {
+      throw new Error(`[API] POST /schedule/${scheduleId}/exercises returned invalid payload`)
+    }
+    return item
+  },
+
+  // GET /exercises (public)
+  async listExercises(): Promise<ApiExerciseCatalogItem[]> {
+    const raw = await publicApiFetch<unknown>('/exercises')
+    if (!Array.isArray(raw)) return []
+    return raw.map(normalizeApiExerciseCatalogItem).filter((x): x is ApiExerciseCatalogItem => x != null)
+  },
+
+  // GET /pain/:userId
+  async listPainLogs(userId: number): Promise<ApiPainLog[]> {
+    const raw = await apiFetch<unknown>(`/pain/${userId}`)
+    if (!Array.isArray(raw)) return []
+    return raw.map(normalizeApiPainLog).filter((x): x is ApiPainLog => x != null)
   },
 
   /**

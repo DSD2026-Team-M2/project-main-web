@@ -462,13 +462,29 @@ code {
 .doctor-patient-dock {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    'notes pain'
+    'prescription prescription';
   gap: 1rem;
   padding: 0 1.5rem 1.5rem;
   margin-top: 0;
   align-items: start;
 }
 
+.doctor-patient-dock .notes-card {
+  grid-area: notes;
+}
+
+.doctor-patient-dock .pain-card {
+  grid-area: pain;
+}
+
+.doctor-patient-dock .prescription-card {
+  grid-area: prescription;
+}
+
 .doctor-patient-dock .notes-card,
+.doctor-patient-dock .pain-card,
 .doctor-patient-dock .prescription-card {
   margin: 0;
   min-width: 0;
@@ -527,6 +543,435 @@ code {
   overflow-y: auto;
 }
 
+.pain-card-header,
+.prescription-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.pain-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pain-card-header .card-title,
+.prescription-card-header .card-title {
+  margin: 0;
+}
+
+.pain-pending {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.pain-error {
+  color: #ef4444;
+}
+
+.pain-log-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.pain-log-row {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pain-log-row--alert {
+  background: #fef2f2;
+  margin: 0 -0.5rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  border-radius: 6px;
+}
+
+.pain-level-badge {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+}
+
+.pain-log-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.pain-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+}
+
+.pain-log-label {
+  font-weight: 600;
+}
+
+.pain-log-notes {
+  margin: 0.2rem 0 0;
+}
+
+.pain-load-more {
+  margin-top: 0.5rem;
+}
+
+.pain-trend-chart {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pain-trend-label {
+  margin: 0 0 0.25rem;
+}
+
+.rehab-plan-workspace {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.rehab-plans-section {
+  padding: 0.75rem 0.85rem 0.85rem;
+}
+
+.rehab-section-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.rehab-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.rehab-plan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.rehab-plan-card:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.rehab-plan-card--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: inset 4px 0 0 #2563eb, 0 0 0 1px #93c5fd;
+}
+
+.rehab-plan-selected-mark {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #dbeafe;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
+.rehab-plan-card-body {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rehab-plan-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.rehab-plan-notes {
+  margin: 0.2rem 0 0;
+}
+
+.rehab-plan-select-hint {
+  margin: 0;
+  padding: 0.85rem 1rem 1rem;
+  border-top: 2px dashed #cbd5e1;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.rehab-plan-detail {
+  background: #f1f5f9;
+  padding: 0 0.85rem 0.85rem;
+}
+
+.rehab-plan-detail-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.85rem;
+  background: #e2e8f0;
+  border-top: 2px solid #94a3b8;
+  border-bottom: 1px solid #cbd5e1;
+  margin: 0 -0.85rem 0.75rem;
+}
+
+.rehab-plan-detail-divider::before,
+.rehab-plan-detail-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #94a3b8;
+}
+
+.rehab-plan-detail-divider-label {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.rehab-plan-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.rehab-plan-detail-heading {
+  min-width: 0;
+}
+
+.rehab-plan-detail-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f2a4e;
+}
+
+.rehab-plan-detail-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.rehab-exercise-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.rehab-exercise-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rehab-exercise-name {
+  margin: 0;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rehab-phase-tag {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.rehab-exercise-notes {
+  margin: 0.2rem 0 0;
+}
+
+.rehab-exercise-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.rehab-pain-chip {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid;
+  border-radius: 4px;
+}
+
+.entry-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(10, 22, 42, 0.46);
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.entry-modal {
+  width: min(95vw, 460px);
+  border-radius: 16px;
+  padding: 1rem 1.05rem;
+  background: #fff;
+  border: 1px solid #d2def0;
+  box-sizing: border-box;
+}
+
+.entry-modal.exercise-picker-modal {
+  width: min(92vw, 860px);
+  max-height: 88vh;
+  padding: 1.35rem 1.5rem 1.25rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.exercise-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.exercise-picker-search {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+.exercise-picker-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 280px;
+  max-height: min(62vh, 520px);
+}
+
+.exercise-picker-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.exercise-picker-row .btn {
+  flex-shrink: 0;
+  min-width: 5.5rem;
+  white-space: nowrap;
+}
+
+.exercise-picker-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.exercise-picker-name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.exercise-picker-category {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-left: 0.35rem;
+}
+
+.exercise-picker-desc {
+  margin: 0.25rem 0 0;
+}
+
+.entry-modal.prescription-form-modal {
+  width: min(92vw, 680px);
+  padding: 1.35rem 1.5rem 1.25rem;
+}
+
+.prescription-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+
+.prescription-modal-form textarea {
+  min-height: 88px;
+}
+
+.prescription-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 560px) {
+  .prescription-modal-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .prescription-modal-grid label:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.prescription-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
 .notes-card {
   margin: 0 1.5rem 1.5rem;
 }
@@ -534,6 +979,10 @@ code {
 @media (max-width: 1100px) {
   .doctor-patient-dock {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      'notes'
+      'pain'
+      'prescription';
   }
 }
 

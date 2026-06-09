@@ -271,3 +271,11 @@
   }
 }
 
+/* Rehab modals — override legacy .feedback-modal width cap */
+.entry-modal.exercise-picker-modal {
+  width: min(92vw, 860px);
+}
+
+.entry-modal.prescription-form-modal {
+  width: min(92vw, 680px);
+}

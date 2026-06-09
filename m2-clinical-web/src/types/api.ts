@@ -87,6 +87,7 @@ export type ApiScheduleItem = {
   notes: string
   status: 'pending' | 'completed' | 'skipped'
   created_at?: string
+  doctor_name?: string
 }
 
 export type CreateScheduleInput = {
@@ -95,6 +96,69 @@ export type CreateScheduleInput = {
   date: string
   duration: number
   notes: string
+  status?: 'pending' | 'completed' | 'skipped'
+}
+
+export type ExercisePhase = 'Warm Up' | 'Strength' | 'Mobility' | 'Cooldown'
+
+export const EXERCISE_PHASES: ExercisePhase[] = [
+  'Warm Up',
+  'Strength',
+  'Mobility',
+  'Cooldown',
+]
+
+export type ApiExerciseCatalogItem = {
+  id: number
+  name: string
+  category: string
+  description: string
+  gif_url: string | null
+  thumbnail_url?: string | null
+}
+
+export type ApiScheduleExercise = {
+  id: number
+  name: string
+  phase: ExercisePhase | string
+  sets: number
+  reps: number
+  holdSeconds: number
+  notes: string
+  gif_url: string | null
+  description: string
+  completed: boolean
+  lastPainLevel: number | null
+}
+
+export type ApiScheduleDetail = {
+  scheduleId: number
+  exercise: string
+  date: string
+  duration: number
+  notes: string
+  status: 'pending' | 'completed' | 'skipped'
+  doctorName: string
+  exercises: ApiScheduleExercise[]
+}
+
+export type CreateScheduleExerciseInput = {
+  name: string
+  phase: ExercisePhase
+  sets: number
+  reps: number
+  hold_seconds: number
+  notes: string
+  gif_url: string | null
+  description: string
+}
+
+export type ApiPainLog = {
+  id: number
+  user_id: number
+  level: number
+  notes: string | null
+  created_at: string
 }
 
 export type FeedbackStatus = 'pending' | 'reviewed' | 'resolved'
