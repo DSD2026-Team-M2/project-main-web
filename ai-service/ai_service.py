@@ -5,6 +5,7 @@ FastAPI wrapper for Borges generate_recommendation_from_curves.py (v1-motion-sta
 Endpoints:
     GET  /health
     GET  /ai/standard-curve?action=walking|squat|upstairs
+    GET  /ai/standard-curve-overlay?action=...&sessionId=...
     POST /ai/recommend  body: {"action", "sessionId"}
 
 Run locally:
@@ -30,6 +31,10 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_BORGES = _REPO_ROOT / "v1-motion-standard-curves-main"
 
 BORGES_ROOT = Path(os.environ.get("BORGES_ROOT", _DEFAULT_BORGES))
+if str(BORGES_ROOT) not in sys.path:
+    sys.path.insert(0, str(BORGES_ROOT))
+
+import generate_recommendation_from_curves as borges  # noqa: E402
 # Default to the same interpreter running uvicorn (avoids Windows "python3" → rc=9009).
 PYTHON_BIN = os.environ.get("PYTHON_BIN") or sys.executable
 SCRIPT_TIMEOUT_SEC = int(os.environ.get("SCRIPT_TIMEOUT_SEC", "90"))
@@ -127,6 +132,44 @@ def standard_curve(action: str = Query(..., description="walking | squat | upsta
         "source": rel,
         "points": _read_standard_curve_points(std_csv),
     }
+
+
+@app.get("/ai/standard-curve-overlay")
+def standard_curve_overlay(
+    action: str = Query(..., description="walking | squat | upstairs"),
+    sessionId: int = Query(..., ge=1, description="V2 session id"),
+):
+    """Build a session-specific standard overlay timeline (multi-segment for walking/squat)."""
+    action = _normalize_action(action)
+    if action not in VALID_ACTIONS:
+        raise HTTPException(400, f"action inválida; usa um de: {sorted(VALID_ACTIONS)}")
+
+    std_csv = STANDARD_CSV[action]
+    if not std_csv.is_file():
+        raise HTTPException(500, f"standard csv não encontrado em {std_csv}")
+
+    try:
+        payload = borges.build_session_standard_overlay(
+            action=action,
+            session_id=sessionId,
+            standard_csv_path=str(std_csv),
+            base_url=MEASUREMENTS_BASE_URL,
+            angle_id="left_knee",
+        )
+    except (HTTPException,):
+        raise
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(500, f"overlay falhou: {exc}") from exc
+
+    try:
+        rel = str(std_csv.relative_to(BORGES_ROOT))
+    except ValueError:
+        rel = str(std_csv)
+
+    payload["standardSource"] = rel
+    return payload
 
 
 @app.post("/ai/recommend")

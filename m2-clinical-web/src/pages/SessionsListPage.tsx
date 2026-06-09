@@ -6,9 +6,14 @@ import type { ApiMeasurement, ApiSession } from '../types/api'
 import { LoadingBlock } from '../components/common/LoadingBlock'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { useI18n } from '../i18n/I18nContext'
+import { useApiPatientInfo } from '../hooks/useApiPatientInfo'
 import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
+import { sessionActionTypeLabelKey } from '../utils/sessionActionType'
 
 const COLLECTOR_EXE_URL = `${import.meta.env.BASE_URL}downloads/DSD-Collector.exe`
+
+/** Cross-session trend chart — hidden until needed again */
+const SHOW_CROSS_SESSION_TREND = false
 
 function extractDataZoomPercent(e: unknown): { start: number; end: number } | null {
   if (!e || typeof e !== 'object') return null
@@ -25,6 +30,7 @@ export function SessionsListPage() {
   const { patientId = '1' } = useParams<{ patientId: string }>()
   const navigate = useNavigate()
   const { t, locale } = useI18n()
+  const { apiPatientName, isApiPatient } = useApiPatientInfo(patientId)
   const uid = Number(patientId)
 
   // ── data ──────────────────────────────────────────────────────────────────
@@ -40,7 +46,7 @@ export function SessionsListPage() {
   const endPickerRef = useRef<HTMLInputElement | null>(null)
 
   const [trendZoom, setTrendZoom] = useState({ start: 0, end: 100 })
-  const [sessionsListOpen, setSessionsListOpen] = useState(false)
+  const [sessionsListOpen, setSessionsListOpen] = useState(true)
 
   const load = useCallback(async () => {
     if (isNaN(uid)) { setSessions([]); setLoading(false); return }
@@ -58,11 +64,15 @@ export function SessionsListPage() {
         (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
       )
       setSessions(sorted)
-      const ms = await Promise.all(
-        sorted.map((s) => patientApiService.listMeasurements(s.id, { startDate, endDate })),
-      )
-      // Defensive: backend may return non-array; never allow undefined to crash charts.
-      setAllMeasurements(ms.map((x) => (Array.isArray(x) ? x : [])))
+      if (SHOW_CROSS_SESSION_TREND) {
+        const ms = await Promise.all(
+          sorted.map((s) => patientApiService.listMeasurements(s.id, { startDate, endDate })),
+        )
+        // Defensive: backend may return non-array; never allow undefined to crash charts.
+        setAllMeasurements(ms.map((x) => (Array.isArray(x) ? x : [])))
+      } else {
+        setAllMeasurements([])
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('loadFailed'))
     } finally {
@@ -76,13 +86,9 @@ export function SessionsListPage() {
     setTrendZoom({ start: 0, end: 100 })
   }, [uid, startDate, endDate])
 
-  useEffect(() => {
-    setSessionsListOpen(false)
-  }, [uid])
-
   // ── trend chart across sessions ───────────────────────────────────────────
   const trendOption = useMemo(() => {
-    if (sessions.length === 0 || allMeasurements.length === 0) return null
+    if (!SHOW_CROSS_SESSION_TREND || sessions.length === 0 || allMeasurements.length === 0) return null
 
     const jointIds = new Set<string>()
     allMeasurements.forEach((ms) => {
@@ -201,8 +207,12 @@ export function SessionsListPage() {
     <div className="page doctor-workspace-page">
       <header className="page-header">
         <div>
-          <h1>{t('sessionsTitle')}</h1>
-          <p className="muted">{t('sessionsDesc', { patientId })}</p>
+          <h1>{t('patientArchiveTitle')}</h1>
+          <p className="muted">
+            {isApiPatient
+              ? t('patientArchiveSubtitle', { name: apiPatientName, patientId })
+              : t('patientArchiveSubtitleId', { patientId })}
+          </p>
         </div>
       </header>
 
@@ -216,68 +226,8 @@ export function SessionsListPage() {
         </section>
       ) : (
         <>
-          {/* ── Date range filter ── */}
-          <section className="card" style={{ marginBottom: '1rem' }}>
-            <div className="role-actions" style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
-              <label className="muted small">
-                {t('dateFilterStart')}
-                <span style={{ position: 'relative', display: 'inline-block', marginLeft: 8 }}>
-                  {/* Visible input (prevents locale placeholder like yyyy/mm/日) */}
-                  <input
-                    type="text"
-                    readOnly
-                    className="patient-select"
-                    value={startDate}
-                    placeholder="YYYY-MM-DD"
-                    onClick={() => (startPickerRef.current as any)?.showPicker?.() ?? startPickerRef.current?.focus()}
-                    style={{ width: 160 }}
-                  />
-                  {/* Hidden native date picker */}
-                  <input
-                    ref={startPickerRef}
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
-                    tabIndex={-1}
-                    aria-hidden="true"
-                  />
-                </span>
-              </label>
-              <label className="muted small">
-                {t('dateFilterEnd')}
-                <span style={{ position: 'relative', display: 'inline-block', marginLeft: 8 }}>
-                  <input
-                    type="text"
-                    readOnly
-                    className="patient-select"
-                    value={endDate}
-                    placeholder="YYYY-MM-DD"
-                    onClick={() => (endPickerRef.current as any)?.showPicker?.() ?? endPickerRef.current?.focus()}
-                    style={{ width: 160 }}
-                  />
-                  <input
-                    ref={endPickerRef}
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
-                    tabIndex={-1}
-                    aria-hidden="true"
-                  />
-                </span>
-              </label>
-              <button type="button" className="btn ghost" onClick={() => { setStartDate(''); setEndDate('') }}>
-                {t('dateFilterClear')}
-              </button>
-              <button type="button" className="btn primary" onClick={() => void load()}>
-                {t('dateFilterApply')}
-              </button>
-            </div>
-          </section>
-
-          {/* ── Cross-session Trend Chart ── */}
-          {trendOption ? (
+          {/* ── Cross-session Trend Chart (SHOW_CROSS_SESSION_TREND) ── */}
+          {SHOW_CROSS_SESSION_TREND && trendOption ? (
             <section className="card" style={{ marginBottom: '1rem' }}>
               <h2 className="card-title">{t('patientDashboardTrend')}</h2>
               <ReactECharts
@@ -288,10 +238,13 @@ export function SessionsListPage() {
             </section>
           ) : null}
 
-          {/* ── Sessions List (collapsible) ── */}
-          <section className="card collapsible-card" style={{ marginBottom: '1rem' }}>
+          {/* ── Sessions list + date filter ── */}
+          <section className="card collapsible-card sessions-records-card" style={{ marginBottom: '1rem' }}>
             <div className="collapsible-head">
-              <h2 className="card-title">{t('patientDashboardSessions')}</h2>
+              <div className="sessions-records-head-text">
+                <h2 className="card-title">{t('patientDashboardSessions')}</h2>
+                <p className="muted small sessions-card-hint">{t('sessionsCardHint')}</p>
+              </div>
               <div className="collapsible-actions">
                 <a
                   href={COLLECTOR_EXE_URL}
@@ -323,6 +276,63 @@ export function SessionsListPage() {
             ) : null}
             {sessionsListOpen || sessions.length === 0 ? (
               <div id="sessions-list-panel" className="collapsible-body">
+                <div
+                  className="role-actions sessions-date-filter"
+                  style={{ justifyContent: 'flex-start', flexWrap: 'wrap', gap: 10 }}
+                >
+                  <label className="muted small">
+                    {t('dateFilterStart')}
+                    <span style={{ position: 'relative', display: 'inline-block', marginLeft: 8 }}>
+                      <input
+                        type="text"
+                        readOnly
+                        className="patient-select"
+                        value={startDate}
+                        placeholder="YYYY-MM-DD"
+                        onClick={() => (startPickerRef.current as any)?.showPicker?.() ?? startPickerRef.current?.focus()}
+                        style={{ width: 160 }}
+                      />
+                      <input
+                        ref={startPickerRef}
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
+                        tabIndex={-1}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </label>
+                  <label className="muted small">
+                    {t('dateFilterEnd')}
+                    <span style={{ position: 'relative', display: 'inline-block', marginLeft: 8 }}>
+                      <input
+                        type="text"
+                        readOnly
+                        className="patient-select"
+                        value={endDate}
+                        placeholder="YYYY-MM-DD"
+                        onClick={() => (endPickerRef.current as any)?.showPicker?.() ?? endPickerRef.current?.focus()}
+                        style={{ width: 160 }}
+                      />
+                      <input
+                        ref={endPickerRef}
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        style={{ position: 'absolute', inset: 0, opacity: 0, pointerEvents: 'none' }}
+                        tabIndex={-1}
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </label>
+                  <button type="button" className="btn ghost" onClick={() => { setStartDate(''); setEndDate('') }}>
+                    {t('dateFilterClear')}
+                  </button>
+                  <button type="button" className="btn primary" onClick={() => void load()}>
+                    {t('dateFilterApply')}
+                  </button>
+                </div>
                 {sessions.length === 0 ? (
                   <p className="muted">{t('sessionsEmpty')}</p>
                 ) : (
@@ -340,6 +350,8 @@ export function SessionsListPage() {
                             {formatSessionStartedAt(s.started_at)}
                             {' · '}
                             {formatDuration(s.started_at, s.ended_at)}
+                            {' · '}
+                            {t(sessionActionTypeLabelKey(s.action_type))}
                             {' · '}
                             {s.measurement_count} {t('sessionMeasurements').toLowerCase()}
                           </p>

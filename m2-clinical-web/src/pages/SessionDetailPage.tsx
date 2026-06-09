@@ -9,7 +9,11 @@ import { useI18n } from '../i18n/I18nContext'
 import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
 import { AiCurveAnalysisCard } from '../components/doctor/AiCurveAnalysisCard'
 import { aiRecommendationApiService } from '../services/aiRecommendationApiService'
-import type { AiCurveAction, StandardCurveResponse } from '../types/aiRecommendation'
+import type { AiCurveAction, StandardCurveOverlayResponse } from '../types/aiRecommendation'
+import {
+  sessionActionTypeLabelKey,
+  sessionActionTypeToAiCurve,
+} from '../utils/sessionActionType'
 
 const OVERLAY_ACTIONS: AiCurveAction[] = ['walking', 'squat', 'upstairs']
 /** Match dashed standard line + band fill on chart */
@@ -58,13 +62,68 @@ function getOverlayTimeRange(measurements: ApiMeasurement[]): [number, number] |
   return [tMin, tMax]
 }
 
-function mapStandardPointsToTimeline(
-  points: StandardCurveResponse['points'],
-  tMin: number,
-  tMax: number,
+function overlayPointsToLineData(
+  points: StandardCurveOverlayResponse['points'],
+  valueKey: 'angle' | 'bandLow' | 'bandHigh',
 ): [number, number][] {
-  const span = tMax - tMin
-  return points.map((p) => [tMin + (span * p.percent) / 100, p.angle] as [number, number])
+  return points.map((p) => {
+    const t = p.timeMs
+    const v = p[valueKey]
+    if (t == null || v == null) return [Number.NaN, Number.NaN]
+    return [t, v] as [number, number]
+  })
+}
+
+function splitOverlayRuns(points: StandardCurveOverlayResponse['points']) {
+  const runs: StandardCurveOverlayResponse['points'][] = []
+  let current: StandardCurveOverlayResponse['points'] = []
+  for (const point of points) {
+    if (point.timeMs == null || point.angle == null) {
+      if (current.length > 0) {
+        runs.push(current)
+        current = []
+      }
+      continue
+    }
+    current.push(point)
+  }
+  if (current.length > 0) runs.push(current)
+  return runs
+}
+
+function interpolateOverlayAt(
+  points: StandardCurveOverlayResponse['points'],
+  timeMs: number,
+  valueKey: 'angle' | 'bandLow' | 'bandHigh',
+): number | null {
+  for (const run of splitOverlayRuns(points)) {
+    if (run.length === 0) continue
+    const tMin = run[0].timeMs!
+    const tMax = run[run.length - 1].timeMs!
+    if (timeMs < tMin || timeMs > tMax) continue
+
+    if (timeMs <= tMin) {
+      const v = run[0][valueKey]
+      return v == null ? null : v
+    }
+    if (timeMs >= tMax) {
+      const v = run[run.length - 1][valueKey]
+      return v == null ? null : v
+    }
+
+    for (let i = 1; i < run.length; i++) {
+      const t0 = run[i - 1].timeMs!
+      const t1 = run[i].timeMs!
+      const y0 = run[i - 1][valueKey]
+      const y1 = run[i][valueKey]
+      if (y0 == null || y1 == null) continue
+      if (timeMs <= t1) {
+        const w = (timeMs - t0) / (t1 - t0)
+        return y0 + w * (y1 - y0)
+      }
+    }
+  }
+  return null
 }
 
 function interpolateLineAt(data: [number, number][], timeMs: number): number | null {
@@ -137,10 +196,15 @@ export function SessionDetailPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
 
-  // ── standard curve overlay (session has no action field — user picks manually) ─
+  const sessionDefaultAction = useMemo(
+    () => sessionActionTypeToAiCurve(sessionMeta?.action_type),
+    [sessionMeta?.action_type],
+  )
+
+  // ── standard curve overlay — defaults to session action_type when known ─
   const [showStandardOverlay, setShowStandardOverlay] = useState(false)
   const [overlayAction, setOverlayAction] = useState<AiCurveAction>('walking')
-  const [standardCurve, setStandardCurve] = useState<StandardCurveResponse | null>(null)
+  const [standardOverlay, setStandardOverlay] = useState<StandardCurveOverlayResponse | null>(null)
   const [overlayLoading, setOverlayLoading] = useState(false)
   const [overlayErr, setOverlayErr] = useState<string | null>(null)
 
@@ -167,32 +231,47 @@ export function SessionDetailPage() {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
-    if (!showStandardOverlay) {
-      setStandardCurve(null)
+    if (sessionDefaultAction) setOverlayAction(sessionDefaultAction)
+  }, [sessionMeta?.id, sessionDefaultAction])
+
+  const sessionActionLabel = useMemo(() => {
+    const key = sessionActionTypeLabelKey(sessionMeta?.action_type)
+    return t(key)
+  }, [sessionMeta?.action_type, t])
+
+  useEffect(() => {
+    if (!showStandardOverlay || !Number.isFinite(sid) || sid <= 0) {
+      setStandardOverlay(null)
       setOverlayErr(null)
+      setOverlayLoading(false)
       return
     }
+
     let cancelled = false
+    const requestedAction = overlayAction
+    setStandardOverlay(null)
     setOverlayLoading(true)
     setOverlayErr(null)
+
     void aiRecommendationApiService
-      .getStandardCurve(overlayAction)
+      .getStandardCurveOverlay(requestedAction, sid)
       .then((curve) => {
-        if (!cancelled) setStandardCurve(curve)
+        if (cancelled || curve.action !== requestedAction) return
+        setStandardOverlay(curve)
       })
       .catch((e) => {
-        if (!cancelled) {
-          setStandardCurve(null)
-          setOverlayErr(e instanceof Error ? e.message : String(e))
-        }
+        if (cancelled) return
+        setStandardOverlay(null)
+        setOverlayErr(e instanceof Error ? e.message : String(e))
       })
       .finally(() => {
         if (!cancelled) setOverlayLoading(false)
       })
+
     return () => {
       cancelled = true
     }
-  }, [showStandardOverlay, overlayAction])
+  }, [showStandardOverlay, overlayAction, sid])
 
   const overlayActionLabel = useMemo(
     () =>
@@ -203,6 +282,17 @@ export function SessionDetailPage() {
       }) satisfies Record<AiCurveAction, string>,
     [t],
   )
+
+  const overlayHint = useMemo(() => {
+    if (!standardOverlay) return null
+    if (standardOverlay.overlayMode === 'segmented') {
+      return t('sessionChartOverlaySegments', { count: standardOverlay.segmentsUsed })
+    }
+    if (standardOverlay.overlayMode === 'full_session_fallback') {
+      return t('sessionChartOverlayFallback')
+    }
+    return t('sessionChartOverlayFullSession')
+  }, [standardOverlay, t])
 
   // ── chart (time axis: each joint keeps its own sample times; display UTC+8) ─
   const chartOption = useMemo(() => {
@@ -254,72 +344,73 @@ export function SessionDetailPage() {
     })
 
     const legendNames = [...joints]
-    const overlayRange = getOverlayTimeRange(measurements)
     const stdBandLabel = t('sessionChartStandardBand')
-    let overlayBandLow: [number, number][] | null = null
-    let overlayBandHigh: [number, number][] | null = null
-    let overlayStdLine: [number, number][] | null = null
+    let overlayPoints: StandardCurveOverlayResponse['points'] | null = null
     let overlayStdLabel: string | null = null
 
-    if (showStandardOverlay && standardCurve && overlayRange) {
-      const [tMin, tMax] = overlayRange
-      const stdLine = mapStandardPointsToTimeline(standardCurve.points, tMin, tMax)
-      const stdLabel = t('sessionChartStandardLine', { action: overlayActionLabel[overlayAction] })
-      overlayStdLine = stdLine
-      overlayStdLabel = stdLabel
+    const overlayActive =
+      showStandardOverlay &&
+      !overlayLoading &&
+      standardOverlay != null &&
+      standardOverlay.action === overlayAction
 
-      const hasBand = standardCurve.points.every(
+    if (overlayActive) {
+      overlayPoints = standardOverlay.points
+      const stdLine = overlayPointsToLineData(standardOverlay.points, 'angle')
+      const stdLabel = t('sessionChartStandardLine', { action: overlayActionLabel[overlayAction] })
+      overlayStdLabel = stdLabel
+      const overlaySeriesKey = `${overlayAction}-${standardOverlay.segmentsUsed}-${standardOverlay.overlayMode}`
+
+      const hasBand = standardOverlay.points.some(
         (p) => p.bandLow != null && p.bandHigh != null,
       )
       if (hasBand) {
-        const bandLow = mapStandardPointsToTimeline(
-          standardCurve.points.map((p) => ({ ...p, angle: p.bandLow! })),
-          tMin,
-          tMax,
-        )
-        const bandHigh = mapStandardPointsToTimeline(
-          standardCurve.points.map((p) => ({ ...p, angle: p.bandHigh! })),
-          tMin,
-          tMax,
-        )
-        const bandFill = bandHigh.map(([t, high], i) => [t, high - bandLow[i][1]] as [number, number])
-        overlayBandLow = bandLow
-        overlayBandHigh = bandHigh
+        splitOverlayRuns(standardOverlay.points).forEach((run, runIndex) => {
+          if (!run.every((p) => p.bandLow != null && p.bandHigh != null)) return
+          const stackId = `${overlaySeriesKey}-band-${runIndex}`
+          const bandLow: [number, number][] = run.map((p) => [p.timeMs!, p.bandLow!])
+          const bandFill: [number, number][] = run.map((p) => [p.timeMs!, p.bandHigh! - p.bandLow!])
 
-        series.push({
-          name: stdBandLabel,
-          type: 'line',
-          data: bandLow,
-          lineStyle: { opacity: 0, color: STANDARD_BAND_LEGEND },
-          itemStyle: { color: STANDARD_BAND_LEGEND },
-          stack: 'std-band',
-          symbol: 'none',
-          silent: true,
-          tooltip: { show: false },
-          z: 1,
-        })
-        series.push({
-          name: '__std-band-fill',
-          type: 'line',
-          data: bandFill,
-          lineStyle: { opacity: 0 },
-          areaStyle: { color: STANDARD_BAND_FILL },
-          stack: 'std-band',
-          symbol: 'none',
-          silent: true,
-          showInLegend: false,
-          tooltip: { show: false },
-          z: 1,
+          series.push({
+            id: `${stackId}-low`,
+            name: runIndex === 0 ? stdBandLabel : `__std-band-low-${overlaySeriesKey}-${runIndex}`,
+            type: 'line',
+            data: bandLow,
+            lineStyle: { opacity: 0, color: STANDARD_BAND_LEGEND },
+            itemStyle: { color: STANDARD_BAND_LEGEND },
+            stack: stackId,
+            symbol: 'none',
+            silent: true,
+            tooltip: { show: false },
+            showInLegend: runIndex === 0,
+            z: 1,
+          })
+          series.push({
+            id: `${stackId}-fill`,
+            name: `__std-band-fill-${overlaySeriesKey}-${runIndex}`,
+            type: 'line',
+            data: bandFill,
+            lineStyle: { opacity: 0 },
+            areaStyle: { color: STANDARD_BAND_FILL },
+            stack: stackId,
+            symbol: 'none',
+            silent: true,
+            showInLegend: false,
+            tooltip: { show: false },
+            z: 1,
+          })
         })
         legendNames.push(stdBandLabel)
       }
 
       series.push({
+        id: `${overlaySeriesKey}-line`,
         name: stdLabel,
         type: 'line',
-        smooth: true,
+        smooth: false,
         showSymbol: false,
         data: stdLine,
+        connectNulls: false,
         lineStyle: { type: 'dashed', width: 2.5, color: STANDARD_LINE_COLOR },
         itemStyle: { color: STANDARD_LINE_COLOR },
         tooltip: { show: false },
@@ -329,6 +420,7 @@ export function SessionDetailPage() {
     }
 
     return {
+      replaceMerge: ['series'],
       tooltip: {
         trigger: 'axis',
         axisPointer: {
@@ -377,16 +469,16 @@ export function SessionDetailPage() {
             lines.push(`${marker}${joint}: ${y.toFixed(2)}°`)
           })
 
-          if (overlayStdLine && overlayStdLabel) {
-            const y = interpolateLineAt(overlayStdLine, axisTime)
+          if (overlayPoints && overlayStdLabel) {
+            const y = interpolateOverlayAt(overlayPoints, axisTime, 'angle')
             if (y != null) {
               lines.push(`${stdMarker}${overlayStdLabel}: ${y.toFixed(2)}°`)
             }
           }
 
-          if (overlayBandLow && overlayBandHigh) {
-            const low = interpolateLineAt(overlayBandLow, axisTime)
-            const high = interpolateLineAt(overlayBandHigh, axisTime)
+          if (overlayPoints) {
+            const low = interpolateOverlayAt(overlayPoints, axisTime, 'bandLow')
+            const high = interpolateOverlayAt(overlayPoints, axisTime, 'bandHigh')
             if (low != null && high != null) {
               lines.push(`${bandMarker}${stdBandLabel}: ${low.toFixed(2)}° ~ ${high.toFixed(2)}°`)
             }
@@ -417,11 +509,14 @@ export function SessionDetailPage() {
     measurements,
     locale,
     showStandardOverlay,
-    standardCurve,
+    overlayLoading,
+    standardOverlay,
     overlayAction,
     overlayActionLabel,
     t,
   ])
+
+  const chartRenderKey = `${sid}-${overlayAction}-${showStandardOverlay ? 'on' : 'off'}`
 
   const canOverlayStandard = useMemo(
     () => getOverlayTimeRange(measurements) != null,
@@ -446,6 +541,11 @@ export function SessionDetailPage() {
           </h1>
           <p className="muted">{t('sessionDetailSessionLine', { id: sessionId })}</p>
           <p className="muted">{t('sessionDetailPatientLine', { patientId })}</p>
+          {sessionMeta ? (
+            <p className="muted">
+              {t('sessionActionType')}: {sessionActionLabel}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -501,17 +601,28 @@ export function SessionDetailPage() {
           <LoadingBlock label={t('sessionChartOverlayLoading')} />
         ) : null}
         {overlayErr && showStandardOverlay ? <ErrorBanner message={overlayErr} /> : null}
+        {showStandardOverlay && overlayHint && !overlayLoading && !overlayErr ? (
+          <p className="muted small" style={{ marginBottom: '0.5rem' }}>
+            {overlayHint}
+          </p>
+        ) : null}
         {loading ? (
           <LoadingBlock label={t('sessionDetailLoading')} />
         ) : measurements.length === 0 ? (
           <p className="muted">{t('sessionChartEmpty')}</p>
         ) : (
-          <ReactECharts option={chartOption} style={{ height: 300 }} />
+          <ReactECharts
+            key={chartRenderKey}
+            option={chartOption}
+            notMerge
+            lazyUpdate={false}
+            style={{ height: 300 }}
+          />
         )}
       </section>
 
       {/* ── AI Curve Analysis (Borges/V1 motion module) ── */}
-      <AiCurveAnalysisCard sessionId={sid} />
+      <AiCurveAnalysisCard sessionId={sid} defaultAction={sessionDefaultAction ?? undefined} />
     </div>
   )
 }

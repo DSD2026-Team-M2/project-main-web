@@ -19,6 +19,29 @@ export type StandardCurveResponse = {
   points: StandardCurvePoint[]
 }
 
+export type StandardCurveOverlayPoint = {
+  timeMs: number | null
+  angle: number | null
+  bandLow?: number | null
+  bandHigh?: number | null
+}
+
+export type StandardCurveOverlayMode =
+  | 'segmented'
+  | 'full_session'
+  | 'full_session_fallback'
+
+export type StandardCurveOverlayResponse = {
+  action: AiCurveAction
+  angleID: string
+  overlayMode: StandardCurveOverlayMode
+  segmentsUsed: number
+  standardSource: string
+  sessionStartMs: number
+  segmentation?: AiCurveSegmentation
+  points: StandardCurveOverlayPoint[]
+}
+
 export type AiCurveStatus = 'normal' | 'mild_deviation' | 'significant_deviation'
 export type AiCurveConfidence = 'high' | 'medium' | 'low'
 

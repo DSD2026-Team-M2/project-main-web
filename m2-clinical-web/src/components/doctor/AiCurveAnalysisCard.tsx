@@ -2,7 +2,7 @@
  * AiCurveAnalysisCard — session detail card for Borges curve-based AI recommendations.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { aiRecommendationApiService } from '../../services/aiRecommendationApiService'
 import type {
   AiCurveAction,
@@ -31,11 +31,12 @@ const COMPONENT_KEYS = [
 
 type Props = {
   sessionId: number
+  defaultAction?: AiCurveAction
 }
 
-export function AiCurveAnalysisCard({ sessionId }: Props) {
+export function AiCurveAnalysisCard({ sessionId, defaultAction }: Props) {
   const { t } = useI18n()
-  const [action, setAction] = useState<AiCurveAction>('walking')
+  const [action, setAction] = useState<AiCurveAction>(defaultAction ?? 'walking')
   const [data, setData] = useState<AiCurveRecommendation | null>(null)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -59,6 +60,10 @@ export function AiCurveAnalysisCard({ sessionId }: Props) {
       }) satisfies Record<AiCurveAction, string>,
     [t],
   )
+
+  useEffect(() => {
+    if (defaultAction) setAction(defaultAction)
+  }, [defaultAction, sessionId])
 
   const componentLabel = useMemo(
     () =>

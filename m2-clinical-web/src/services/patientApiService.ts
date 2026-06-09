@@ -20,6 +20,7 @@ import type {
 import type { HistoryRecord, TrendSeries } from '../types/clinical'
 import { authStore } from './authStore'
 import { extractJointAnglesFromMeasurement } from '../utils/measurementJointAngles'
+import { normalizeSessionActionType } from '../utils/sessionActionType'
 
 // ─── config ──────────────────────────────────────────────────────────────────
 const BASE_URL = 'http://113.44.220.94:3000'
@@ -187,6 +188,31 @@ async function publicApiFetch<T>(path: string): Promise<T> {
   return text ? (JSON.parse(text) as T) : (null as T)
 }
 
+function normalizeApiSession(raw: unknown): ApiSession | null {
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const id = Number(o.id)
+  if (!Number.isFinite(id)) return null
+  const userId = Number(o.user_id ?? o.userId)
+  const clinicianRaw = o.clinician_id ?? o.clinicianId
+  const clinicianId =
+    clinicianRaw == null || clinicianRaw === ''
+      ? undefined
+      : Number.isFinite(Number(clinicianRaw))
+        ? Number(clinicianRaw)
+        : undefined
+  return {
+    id,
+    user_id: Number.isFinite(userId) ? userId : 0,
+    started_at: String(o.started_at ?? ''),
+    ended_at: o.ended_at == null ? null : String(o.ended_at),
+    user_name: String(o.user_name ?? o.userName ?? ''),
+    measurement_count: Number(o.measurement_count ?? o.measurementCount) || 0,
+    action_type: normalizeSessionActionType(o.action_type ?? o.actionType ?? o.action),
+    ...(clinicianId != null ? { clinician_id: clinicianId } : {}),
+  }
+}
+
 function normalizeApiMeasurement(raw: unknown): ApiMeasurement | null {
   if (!raw || typeof raw !== 'object') return null
   const m = raw as Record<string, unknown>
@@ -210,14 +236,16 @@ function normalizeApiMeasurement(raw: unknown): ApiMeasurement | null {
 
 // ─── service ─────────────────────────────────────────────────────────────────
 export const patientApiService = {
-  // GET /patients
+  // GET /patients — requires JWT; server filters by role (clinician → own patients only)
   async listPatients(): Promise<ApiPatient[]> {
     return apiFetch<ApiPatient[]>('/patients')
   },
 
   // GET /sessions?userId=X
   async listSessions(userId: number): Promise<ApiSession[]> {
-    return apiFetch<ApiSession[]>(`/sessions?userId=${userId}`)
+    const raw = await apiFetch<unknown>(`/sessions?userId=${userId}`)
+    if (!Array.isArray(raw)) return []
+    return raw.map(normalizeApiSession).filter((x): x is ApiSession => x != null)
   },
 
   // GET /measurements/:sessionId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD

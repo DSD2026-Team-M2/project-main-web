@@ -258,7 +258,9 @@ export function PatientPrescriptionPanel() {
                     type="button"
                     className={`rehab-plan-card${isSelected ? ' rehab-plan-card--active' : ''}`}
                     aria-pressed={isSelected}
-                    onClick={() => setSelectedPlanId(plan.id)}
+                    onClick={() =>
+                      setSelectedPlanId((current) => (current === plan.id ? null : plan.id))
+                    }
                   >
                     {isSelected ? (
                       <span className="rehab-plan-selected-mark" aria-hidden="true">

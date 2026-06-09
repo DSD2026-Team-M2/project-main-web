@@ -63,6 +63,40 @@ function formatPainTimestamp(iso: string, locale: string): string {
   }
 }
 
+function formatPainTimestampFull(iso: string, locale: string): string {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString(locale, {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  } catch {
+    return iso.replace('T', ' ').slice(0, 19)
+  }
+}
+
+function dayKey(iso: string, locale: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(locale)
+  } catch {
+    return iso.slice(0, 10)
+  }
+}
+
+function buildPainChartAxisLabels(logs: ApiPainLog[], locale: string): Set<string> {
+  const counts = new Map<string, number>()
+  for (const log of logs) {
+    const key = dayKey(log.created_at, locale)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([k]) => k))
+}
+
 function sortPainLogsNewestFirst(logs: ApiPainLog[]): ApiPainLog[] {
   return [...logs].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
@@ -124,13 +158,42 @@ export function PainHistoryPanel() {
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       .slice(-30)
     if (recent.length < 2) return null
+
+    const multiEntryDays = buildPainChartAxisLabels(recent, locale)
+    const seriesData = recent.map((l) => [new Date(l.created_at).getTime(), l.level] as [number, number])
+
     return {
-      grid: { left: 36, right: 12, top: 16, bottom: 28 },
-      tooltip: { trigger: 'axis' as const },
+      grid: { left: 40, right: 12, top: 16, bottom: 36 },
+      tooltip: {
+        trigger: 'axis' as const,
+        formatter: (raw: unknown) => {
+          const params = Array.isArray(raw) ? raw : [raw]
+          const point = params[0] as { value?: [number, number] } | undefined
+          const value = point?.value
+          if (!value || !Array.isArray(value)) return ''
+          const [ts, level] = value
+          const time = formatPainTimestampFull(new Date(ts).toISOString(), locale)
+          return `${time}<br/>${level}/10`
+        },
+      },
       xAxis: {
-        type: 'category' as const,
-        data: recent.map((l) => formatPainTimestamp(l.created_at, locale).slice(0, 11)),
-        axisLabel: { fontSize: 10 },
+        type: 'time' as const,
+        axisLabel: {
+          fontSize: 10,
+          formatter: (value: number) => {
+            const d = new Date(value)
+            const key = d.toLocaleDateString(locale)
+            if (multiEntryDays.has(key)) {
+              return d.toLocaleString(locale, {
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            }
+            return d.toLocaleString(locale, { month: '2-digit', day: '2-digit' })
+          },
+        },
       },
       yAxis: {
         type: 'value' as const,
@@ -142,7 +205,7 @@ export function PainHistoryPanel() {
       series: [
         {
           type: 'line' as const,
-          data: recent.map((l) => l.level),
+          data: seriesData,
           smooth: true,
           symbol: 'circle',
           symbolSize: 6,

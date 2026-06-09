@@ -31,6 +31,11 @@ export function PatientListPage() {
     setLoading(true)
     setErr(null)
     try {
+      if (!authStore.getToken()) {
+        setPatients([])
+        setErr(t('patientListLoginRequired'))
+        return
+      }
       setPatients(await patientApiService.listPatients())
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('loadFailed'))

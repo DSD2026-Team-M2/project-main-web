@@ -21,6 +21,11 @@ export function RoleHomePage() {
   const changelogEntries = useMemo(
     () => [
       {
+        version: '1.0.0',
+        date: t('changelog100Date'),
+        items: [t('changelog100Item1'), t('changelog100Item2'), t('changelog100Item3')],
+      },
+      {
         version: '0.5.0',
         date: t('changelog050Date'),
         items: [

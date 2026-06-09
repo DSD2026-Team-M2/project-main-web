@@ -8,6 +8,7 @@
 import type {
   AiCurveAction,
   AiCurveRecommendation,
+  StandardCurveOverlayResponse,
   StandardCurveResponse,
 } from '../types/aiRecommendation'
 
@@ -35,6 +36,14 @@ export const aiRecommendationApiService = {
   async getStandardCurve(action: AiCurveAction): Promise<StandardCurveResponse> {
     const q = new URLSearchParams({ action })
     return aiFetch<StandardCurveResponse>(`/ai/standard-curve?${q}`)
+  },
+
+  async getStandardCurveOverlay(
+    action: AiCurveAction,
+    sessionId: number,
+  ): Promise<StandardCurveOverlayResponse> {
+    const q = new URLSearchParams({ action, sessionId: String(sessionId) })
+    return aiFetch<StandardCurveOverlayResponse>(`/ai/standard-curve-overlay?${q}`)
   },
 
   async generate(

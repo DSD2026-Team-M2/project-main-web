@@ -154,13 +154,15 @@
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 1rem 1.25rem;
+  padding: 0 0 1.25rem;
   margin-top: 0;
 }
 
 .doctor-shell-portal .doctor-patient-dock .notes-card,
+.doctor-shell-portal .doctor-patient-dock .pain-card,
 .doctor-shell-portal .doctor-patient-dock .prescription-card {
   margin: 0;
+  width: 100%;
 }
 
 /* Re-skin doctor workspace (dark) to patient-portal tokens inside portal shell */

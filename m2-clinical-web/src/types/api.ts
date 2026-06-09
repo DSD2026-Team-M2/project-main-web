@@ -23,6 +23,8 @@ export type UpdateUserInput = {
   doctorId?: number | null
 }
 
+export type SessionActionType = 'walk' | 'squat' | 'climb_stairs' | 'unknown'
+
 export type ApiSession = {
   id: number
   user_id: number
@@ -30,6 +32,9 @@ export type ApiSession = {
   ended_at: string | null
   user_name: string
   measurement_count: number
+  /** V2: walk | squat | climb_stairs | unknown */
+  action_type?: SessionActionType
+  clinician_id?: number | null
 }
 
 export type ApiJointAngle = {
